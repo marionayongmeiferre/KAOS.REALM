@@ -1,0 +1,19 @@
+# La galería y el registro de uso NO suben.
+#
+# `.data/state.json` lo reescribe el servidor cada vez que tocas la galería, y
+# son 7 MB. Cada commit se llevaría el fichero entero otra vez aunque solo
+# hubiera cambiado un diseño, y el repositorio se hincharía sin parar.
+#
+# Dentro va también `usage.json`, el registro de uso: es local y no debe salir
+# de su red, aunque no lleve imágenes ni nombres de fichero.
+#
+# OJO: esto NO borra nada del disco. Los ficheros siguen donde están; lo único
+# que cambia es que git deja de mirarlos. La copia buena de la galería es el
+# propio `.data/state.json` del servidor.
+.data/
+
+# Basura de siempre
+node_modules/
+venv/
+Thumbs.db
+.DS_Store
