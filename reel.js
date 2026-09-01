@@ -20,6 +20,9 @@
   const FUENTE = '"Helvetica Neue LT Std 73 BEx", Impact, sans-serif';
 
   const K_EST = "kaos.reel.v1";
+  // Sube cuando cambia un valor por defecto que ya tenía guardado: si no, el
+  // ajuste viejo de su localStorage gana y parece que el cambio no ha entrado.
+  const VERSION = 2;
 
   // ---------------------------------------------------------------- estado
   const POR_DEFECTO = {
@@ -27,9 +30,21 @@
     frase: "¿CUÁL TE TOCA?",
     cta: "PÁRALO Y ESCRÍBEME",
     dur: 8,                  // segundos totales
-    parada: 2.2,             // cuánto aguanta el ganador al final
-    minInt: 0.06,            // el cambio más rápido, al principio
-    maxInt: 0.85,            // el más lento, justo antes de parar
+    // Cuánto aguanta el ganador antes del logo. Estaba en 2,2 s y se hacía un
+    // hueco muerto entre el último diseño y el cierre: se para, y ahí quieto,
+    // y el ojo ya se ha ido. Un segundo es suficiente para leer el diseño.
+    parada: 1.0,
+    // Cuánto dura la pasada rápida en la que salen TODOS los diseños una vez.
+    // Es el mando que pidió: en vez de adivinar un intervalo, se dice cuánto
+    // quiere que dure el barrido entero y el intervalo sale de dividir.
+    barrido: 2.4,
+    minInt: 0.03,            // el cambio más rápido que se admite
+    maxInt: 0.85,            // tope duro del intervalo
+    // A qué ritmo se queda una vez ha frenado. 0,7 s por diseño es lo que
+    // tarda el ojo en verlo de verdad: por debajo se intuye, no se mira.
+    lento: 0.7,
+    // Cierre con el logotipo completo, en segundos. 0 lo quita.
+    cierre: 1.4,
     fondoVideoUrl: null,     // vídeo de fondo opcional (objectURL)
     fondosPropios: [],       // fotos suyas como fondo, en data:
     // Antes cada diseño llevaba un fondo distinto y el fondo parpadeaba a la
@@ -91,9 +106,19 @@
       const j = JSON.parse(localStorage.getItem(K_EST) || "null");
       // El vídeo de fondo es un objectURL: muere al recargar y guardarlo
       // dejaría un fondo roto sin explicación. Se descarta a propósito.
-      if (j) return Object.assign({}, POR_DEFECTO, j, { fondoVideoUrl: null });
+      if (j) {
+        const st = Object.assign({}, POR_DEFECTO, j, { fondoVideoUrl: null });
+        if ((j.v || 1) < 2) {
+          // v2: menos parada antes del logo y barrido rápido por tiempo.
+          st.parada = POR_DEFECTO.parada;
+          st.barrido = POR_DEFECTO.barrido;
+          st.minInt = POR_DEFECTO.minInt;
+        }
+        st.v = VERSION;
+        return st;
+      }
     } catch (e) {}
-    return Object.assign({}, POR_DEFECTO);
+    return Object.assign({}, POR_DEFECTO, { v: VERSION });
   }
   function guardar(st) {
     try {
@@ -105,22 +130,74 @@
   }
 
   // ---------------------------------------------------------------- ritmo
-  // La ruleta: intervalos que arrancan cortos y se van estirando. Devuelve una
-  // lista de {desde, hasta, slot} en segundos. El último aguanta `parada`.
+  // La ruleta tiene tres tramos:
+  //   1) BARRIDO — pasan todos los diseños una vez, rápido. Dura exactamente
+  //      lo que diga `barrido`, así que el intervalo sale de dividir ese
+  //      tiempo entre cuántos diseños hay. Ella pone el total y ya está.
+  //   2) FRENADA — a partir de ahí el intervalo crece hasta el ritmo lento.
+  //   3) MIRADA  — se queda en el ritmo lento hasta pararse en el ganador.
+  //
+  // Antes no había tramo 1: el intervalo crecía un 11,5% por paso desde el
+  // principio y con 8 s de reel no llegaba a 0,7 s hasta el final. Todo era un
+  // borrón. Y el barrido no se podía medir: dependía de cuántos diseños hubiera.
+  //
+  // Devuelve una lista de {desde, hasta, slot} en segundos.
   function ritmo(st, nSlots) {
     const pasos = [];
-    let t = 0, iv = st.minInt, k = 0;
-    const fin = Math.max(1, st.dur - st.parada);
-    while (t < fin && pasos.length < 400) {
+    const cierre = Math.max(0, st.cierre || 0);
+    const fin = Math.max(1, st.dur - st.parada - cierre);
+    const lento = Math.max(0.05, Math.min(st.lento || 0.7, st.maxInt || 0.85));
+
+    // El barrido no puede comerse todo el giro: si lo hiciera no quedaría sitio
+    // para frenar y no se vería ni un diseño quieto. Se le deja como mucho el
+    // 70% y el resto es la frenada.
+    const barrido = Math.max(0.2, Math.min(st.barrido || 2.4, fin * 0.7));
+    const ivRapido = Math.max(st.minInt || 0.03, barrido / Math.max(1, nSlots));
+
+    let t = 0, k = 0;
+    // 1) el barrido: nSlots pasos iguales, todos los diseños una vez.
+    for (let i = 0; i < nSlots && t < fin; i++) {
+      const hasta = Math.min(fin, t + ivRapido);
+      pasos.push({ desde: t, hasta: hasta, slot: k % nSlots });
+      t = hasta; k++;
+    }
+
+    // 2) la frenada. Se busca a tientas el factor por paso que lleva de
+    // `ivRapido` a `lento` justo en la mitad de lo que queda de giro. Despejarlo
+    // a mano sale una ecuación fea y esto son 40 vueltas de nada.
+    const resto = Math.max(0, fin - t);
+    const frena = Math.max(0.3, resto * 0.5);
+    let f = 1.2;
+    if (ivRapido < lento) {
+      const tardaEn = (x) => {
+        let acc = 0, iv = ivRapido, n = 0;
+        while (iv < lento && n < 500) { acc += iv; iv *= x; n++; }
+        return acc;
+      };
+      let lo = 1.005, hi = 3.0;
+      for (let i = 0; i < 40; i++) {
+        const m = (lo + hi) / 2;
+        if (tardaEn(m) > frena) lo = m; else hi = m;   // frena poco -> más factor
+      }
+      f = (lo + hi) / 2;
+    }
+
+    // 3) frenada y mirada, en el mismo bucle: al llegar a `lento` se queda ahí.
+    let iv = Math.min(lento, ivRapido * f);
+    while (t < fin && pasos.length < 600) {
       const hasta = Math.min(fin, t + iv);
       pasos.push({ desde: t, hasta: hasta, slot: k % nSlots });
-      t = hasta;
-      k++;
-      iv = Math.min(st.maxInt, iv * 1.115);
+      t = hasta; k++;
+      iv = Math.min(lento, iv * f);
     }
-    // El ganador: el que quede al parar, sostenido hasta el final.
+
+    // El ganador: el que quede al parar, sostenido hasta el cierre.
     const ganador = pasos.length ? (pasos[pasos.length - 1].slot + 1) % nSlots : 0;
-    pasos.push({ desde: fin, hasta: st.dur, slot: ganador, ganador: true });
+    pasos.push({ desde: fin, hasta: st.dur - cierre, slot: ganador, ganador: true });
+    // Y el remate: su logotipo entero, a pantalla completa.
+    if (cierre > 0) {
+      pasos.push({ desde: st.dur - cierre, hasta: st.dur, slot: ganador, cierre: true });
+    }
     return pasos;
   }
   function slotEn(pasos, t) {
@@ -281,12 +358,77 @@
 
   // ---------------------------------------------------------------- frame
   // Pinta el fotograma del segundo `t`. `piezas` es lo que devuelve `preparar`.
+  // El logo es negro sobre transparente: sobre un fondo oscuro desaparece, así
+  // que se tiñe. Se guarda el resultado porque rehacerlo en cada fotograma son
+  // 30 lienzos por segundo para nada.
+  function logoTenido(piezas, hex, lw, lh) {
+    const clave = hex + "|" + lw + "x" + lh;
+    if (piezas._logoClave !== clave) {
+      const tc = document.createElement("canvas");
+      tc.width = lw; tc.height = lh;
+      const tx = tc.getContext("2d");
+      tx.drawImage(piezas.logo, 0, 0, lw, lh);
+      tx.globalCompositeOperation = "source-in";
+      tx.fillStyle = hex;
+      tx.fillRect(0, 0, lw, lh);
+      piezas._logoCache = tc;
+      piezas._logoClave = clave;
+    }
+    return piezas._logoCache;
+  }
+
+  // El remate: su logotipo entero a pantalla completa, sobre el negro de marca.
+  // Entra creciendo un poco y apareciendo, no de golpe.
+  function pintarCierre(ctx, piezas, d) {
+    const st = piezas.st;
+    ctx.fillStyle = NEGRO;
+    ctx.fillRect(0, 0, W, H);
+    const cm = st.colMarco || "auto";
+    if (st.marco !== false) pintarMarco(ctx, cm === "auto" ? marcoAuto(ctx) : color(cm));
+
+    const hex = color(st.colHandle);
+    const p = Math.min(1, Math.max(0, d / 0.32));
+    const suave = p * p * (3 - 2 * p);          // entra y frena, sin tirón
+    if (!piezas.logo) return;
+
+    const lw = Math.round(W * 0.62);
+    const lh = Math.round(lw * (piezas.logo.naturalHeight / piezas.logo.naturalWidth));
+    const cy = H * 0.46;
+    const esc = 0.90 + 0.10 * suave;
+    ctx.save();
+    ctx.globalAlpha = suave;
+    ctx.translate(W / 2, cy);
+    ctx.scale(esc, esc);
+    ctx.drawImage(logoTenido(piezas, hex, lw, lh), -lw / 2, -lh / 2);
+    ctx.restore();
+
+    ctx.save();
+    ctx.globalAlpha = suave;
+    ctx.textAlign = "center";
+    ctx.font = "700 40px " + FUENTE;
+    if ("letterSpacing" in ctx) ctx.letterSpacing = "8px";
+    ctx.lineWidth = 4;
+    ctx.strokeStyle = "rgba(10,9,8,0.8)";
+    ctx.lineJoin = "round";
+    ctx.strokeText("@KAOS.REALM", W / 2, cy + lh / 2 + 96);
+    ctx.fillStyle = hex;
+    ctx.fillText("@KAOS.REALM", W / 2, cy + lh / 2 + 96);
+    if ("letterSpacing" in ctx) ctx.letterSpacing = "0px";
+    ctx.restore();
+
+    ctx.save();
+    ctx.globalAlpha = suave;
+    pintarTexto(ctx, st.cta, H * 0.845, 72, color(st.colCta));
+    ctx.restore();
+  }
+
   function pintarFrame(ctx, piezas, t) {
     const st = piezas.st;
     ctx.setTransform(1, 0, 0, 1, 0, 0);
     ctx.clearRect(0, 0, W, H);
 
     const paso = slotEn(piezas.pasos, t);
+    if (paso.cierre) { pintarCierre(ctx, piezas, t - paso.desde); return; }
     const i = paso.slot % Math.max(1, piezas.slots.length);
     const slot = piezas.slots[i];
 
@@ -311,17 +453,16 @@
       pintarMarco(ctx, cm === "auto" ? marcoAuto(ctx) : color(cm));
     }
 
-    // 3) la pegatina. Al parar da un golpecito de escala, para que se note.
-    // La caja va entre la frase de arriba y el CTA de abajo, así que un diseño
-    // muy alargado se encoge en vez de comerse el texto o salirse.
+    // 3) la pegatina. La caja va entre la frase de arriba y el CTA de abajo,
+    // así que un diseño muy alargado se encoge en vez de comerse el texto o
+    // salirse.
+    //
+    // El ganador salía con un rebote de escala (crecía un 10% y se sacudía).
+    // Lo quitó: en un dibujo de línea fina el temblor se lee como un fallo de
+    // encuadre, no como un remate, y es justo el momento en que hay que mirar
+    // el diseño quieto. Ahora se para y ya.
     if (slot && slot.img) {
-      let escala = 1;
-      if (paso.ganador) {
-        const d = t - paso.desde;
-        escala = 1 + 0.10 * Math.exp(-d * 6) * Math.cos(d * 22);   // rebote corto
-      }
-      pintarSticker(ctx, slot.img, W / 2, H * 0.495,
-        W * 0.72 * escala, H * 0.50 * escala, slot.rot);
+      pintarSticker(ctx, slot.img, W / 2, H * 0.495, W * 0.72, H * 0.50, slot.rot);
     }
 
     // 4) frase arriba, CTA abajo, logo y firma en el pie
@@ -338,23 +479,9 @@
       const lg = piezas.logo;
       const lh = Math.round(H * 0.046);
       const lw = Math.round(lh * (lg.naturalWidth / lg.naturalHeight));
-      // El logo es negro sobre transparente: se tiñe del color del handle para
-      // que sobre un fondo oscuro no desaparezca. Se tiñe UNA vez y se guarda:
-      // rehacerlo en cada fotograma son 30 lienzos por segundo para nada.
-      if (piezas._logoTeñido !== hexH) {
-        const tc = document.createElement("canvas");
-        tc.width = lw; tc.height = lh;
-        const tx = tc.getContext("2d");
-        tx.drawImage(lg, 0, 0, lw, lh);
-        tx.globalCompositeOperation = "source-in";
-        tx.fillStyle = hexH;
-        tx.fillRect(0, 0, lw, lh);
-        piezas._logoCache = tc;
-        piezas._logoTeñido = hexH;
-      }
       ctx.save();
       ctx.globalAlpha = 1;
-      ctx.drawImage(piezas._logoCache, W / 2 - lw / 2, yLogo - lh - 16);
+      ctx.drawImage(logoTenido(piezas, hexH, lw, lh), W / 2 - lw / 2, yLogo - lh - 16);
       ctx.restore();
     }
     ctx.save();
@@ -412,7 +539,9 @@
       });
       video = ok ? v : null;
     }
-    const logo = st.logo === false ? null : await cargarImg("uploads/kaos_logo.PNG");
+    // Se carga aunque haya quitado el logo del pie: el cierre lo necesita igual.
+    const logo = (st.logo === false && !(st.cierre > 0))
+      ? null : await cargarImg("uploads/kaos_logo.PNG");
     return { st: st, slots: slots, pasos: ritmo(st, Math.max(1, slots.length)), video: video, logo: logo };
   }
 

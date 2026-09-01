@@ -684,7 +684,63 @@ input[type="file"] { display: none; }
   border-radius: 2px;
 }
 .reel-side input[type="text"]:focus { outline: none; border-color: #d4ff2f; }
-.reel-tira { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 8px; }
+/* Con 50 diseños la tira medía media pantalla y empujaba todos los ajustes
+   fuera de la vista. Se le pone techo y scroll propio. */
+.reel-tira {
+  display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 8px;
+  max-height: 216px; overflow-y: auto;
+  padding-right: 2px;
+}
+
+/* Colores a golpe de vista, no en desplegable: un desplegable obliga a leer el
+   nombre del color y a imaginárselo. Aquí se ve. */
+.reel-colores { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 4px; }
+.reel-col {
+  width: 30px; height: 30px; padding: 0; cursor: pointer;
+  border: 1px solid rgba(255, 255, 255, 0.28);
+  border-radius: 50%;
+  position: relative;
+  transition: transform .12s ease;
+}
+.reel-col:hover { transform: scale(1.12); }
+.reel-col.on {
+  box-shadow: 0 0 0 2px #0a0908, 0 0 0 4px #d4ff2f;
+  border-color: rgba(255, 255, 255, 0.7);
+}
+.reel-col-auto {
+  background: linear-gradient(135deg, #e8e2d4 0 50%, #0a0908 50% 100%);
+  font-size: 9px; font-weight: 800; color: #ff3d5c;
+  display: flex; align-items: center; justify-content: center;
+}
+
+/* Los fondos, igual: miniatura de lo que va a salir. */
+.reel-fondos {
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(56px, 1fr));
+  gap: 6px; margin-top: 4px;
+}
+.reel-fondo {
+  position: relative; padding: 0; cursor: pointer;
+  aspect-ratio: 9 / 16;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  border-radius: 2px;
+  background: #0a0908;
+}
+.reel-fondo img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.reel-fondo.on { box-shadow: 0 0 0 2px #d4ff2f inset; border-color: #d4ff2f; }
+.reel-fondo-n {
+  position: absolute; left: 0; right: 0; bottom: 0;
+  font-size: 8px; font-weight: 700; letter-spacing: .04em;
+  padding: 2px 1px; text-align: center;
+  background: rgba(10, 9, 8, 0.82); color: #e8e2d4;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.reel-fondo-rotar {
+  display: flex; align-items: center; justify-content: center;
+  font-size: 9px; font-weight: 800; line-height: 1.15; text-align: center;
+  color: #d4ff2f;
+  background: repeating-linear-gradient(45deg, #14120f 0 6px, #0a0908 6px 12px);
+}
 .reel-chip {
   position: relative;
   width: 62px; height: 62px;

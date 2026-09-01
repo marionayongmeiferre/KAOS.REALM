@@ -30,6 +30,15 @@
     cta:      $("#reelCta"),
     dur:      $("#reelDur"),
     durVal:   $("#reelDurVal"),
+    lento:    $("#reelLento"),
+    lentoVal: $("#reelLentoVal"),
+    barrido:  $("#reelBarrido"),
+    barridoVal: $("#reelBarridoVal"),
+    barridoTip: $("#reelBarridoTip"),
+    parada:   $("#reelParada"),
+    paradaVal: $("#reelParadaVal"),
+    cierre:   $("#reelCierre"),
+    cierreVal: $("#reelCierreVal"),
     vidInput: $("#reelVideoInput"),
     vidBtn:   $("#reelVideoBtn"),
     vidQuit:  $("#reelVideoQuitBtn"),
@@ -41,6 +50,11 @@
     aviso:    $("#reelAviso"),
   };
   if (!D.modal || !D.openBtn) { console.warn("reel-ui: falta el marcado"); return; }
+
+  // Cuántos diseños caben en una ruleta. Estaba en 12 porque el ritmo viejo no
+  // dejaba ver más; ahora la pasada rápida se mide en segundos y da igual
+  // cuántos haya, así que el tope es sólo para que la tira no sea infinita.
+  const TOPE = 50;
 
   let st = REEL.estado();
   let pararPrevia = null;
@@ -83,6 +97,8 @@
     const n = list.length;
     D.recBtn.disabled = n < 2 || grabando;
     D.playBtn.disabled = n < 2;
+    D.addBtn.disabled = n >= TOPE;
+    pintarBarrido();
     decir(n ? n + " diseños en la ruleta" : "Añade al menos 2 diseños.");
     if (n) dibujarQuieto();
   }
@@ -92,7 +108,11 @@
     const list = items();
     if (!list.length) return;
     const piezas = await REEL.preparar(st, list);
-    REEL.pintarFrame(D.canvas.getContext("2d"), piezas, st.dur - 0.01);
+    // El fotograma quieto es el del GANADOR, no el ultimo del todo: el ultimo
+    // ahora es el cierre con el logo, y de previa taparia el encuadre del
+    // diseno, que es justo lo que ella esta mirando al montar la ruleta.
+    const cierre = st.cierre > 0 ? st.cierre : 0;
+    REEL.pintarFrame(D.canvas.getContext("2d"), piezas, st.dur - cierre - 0.01);
   }
 
   // ---------------------------------------------------------------- elegir
@@ -102,6 +122,7 @@
     }));
   }
   D.addBtn.addEventListener("click", () => {
+    if (st.ids.length >= TOPE) { decir("Ya hay " + TOPE + " diseños, que es el tope.", true); return; }
     const puestos = new Set(st.ids);
     pedirDiseno((it) => {
       st.ids.push(it.id);
@@ -113,7 +134,7 @@
     // El atajo obvio: el reel de ruleta es justo para anunciar el flash day.
     const ids = GAL.conTag("FLASH DAY").map(it => it.id);
     if (!ids.length) { decir("No hay ningún diseño marcado como FLASH DAY.", true); return; }
-    st.ids = ids.slice(0, 12);   // más de 12 no se distinguen a esa velocidad
+    st.ids = ids.slice(0, TOPE);
     REEL.guardar(st);
     pintarTira();
   });
@@ -153,41 +174,57 @@
     const hay = new Set(GAL.load().map(x => x.id));
     const buenos = ids.filter(x => hay.has(x));
     if (!buenos.length) { decir("Esa hoja ya no tiene diseños en la galería.", true); D.hojaSel.value = ""; return; }
-    st.ids = buenos.slice(0, 12);
+    st.ids = buenos.slice(0, TOPE);
     REEL.guardar(st);
     pintarTira();
     const perdidos = ids.length - buenos.length;
-    const recorte = buenos.length > 12 ? " (me quedo con los 12 primeros: más no se distinguen)" : "";
+    const recorte = buenos.length > TOPE ? " (me quedo con los " + TOPE + " primeros)" : "";
     decir("Cargados " + st.ids.length + " diseños de «" + h.name + "»"
       + (perdidos ? ", " + perdidos + " ya no están en la galería" : "") + recorte);
     D.hojaSel.value = "";
   });
 
   // ------------------------------------------------------ colores del texto
-  function enlazarColor(sel, campo, conAuto) {
-    if (!sel) return;
-    sel.textContent = "";
-    if (conAuto) {
-      // Sólo el marco. Es la opción buena por defecto: el fondo lo elige ella y
-      // cualquier color fijo acaba tarde o temprano encima de un fondo del
-      // mismo color, y ahí el marco desaparece.
-      const a = document.createElement("option");
-      a.value = "auto";
-      a.textContent = "AUTO (contrasta con el fondo)";
-      sel.appendChild(a);
+  // Antes esto era un desplegable con los nombres de los colores. Para elegir
+  // un color había que leer "MAGENTA" e imaginárselo, y con el panel cerrado no
+  // se veía cuál estaba puesto. Ahora son los colores, se pincha y ya.
+  function enlazarColor(caja, campo, conAuto) {
+    if (!caja) return;
+    caja.textContent = "";
+    const botones = [];
+    const poner = (valor, hex, titulo, esAuto) => {
+      const b = document.createElement("button");
+      b.type = "button";
+      b.className = "reel-col" + (esAuto ? " reel-col-auto" : "");
+      b.dataset.valor = valor;
+      b.title = titulo;
+      b.setAttribute("aria-label", titulo);
+      if (esAuto) b.textContent = "A"; else b.style.background = hex;
+      b.addEventListener("click", () => {
+        st[campo] = valor;
+        REEL.guardar(st);
+        marcar();
+        caja.dispatchEvent(new Event("change", { bubbles: true }));
+        dibujarQuieto();
+      });
+      caja.appendChild(b);
+      botones.push(b);
+    };
+    // Sólo el marco lleva AUTO. Es la opción buena por defecto: el fondo lo
+    // elige ella y cualquier color fijo acaba tarde o temprano encima de un
+    // fondo del mismo color, y ahí el marco desaparece.
+    if (conAuto) poner("auto", null, "AUTO (contrasta con el fondo)", true);
+    for (const k in REEL.PALETA) poner(k, REEL.PALETA[k].hex, REEL.PALETA[k].nombre, false);
+
+    function marcar() {
+      const v = st[campo] || (conAuto ? "auto" : "secondary");
+      for (const b of botones) {
+        const on = b.dataset.valor === v;
+        b.classList.toggle("on", on);
+        b.setAttribute("aria-pressed", on ? "true" : "false");
+      }
     }
-    for (const k in REEL.PALETA) {
-      const o = document.createElement("option");
-      o.value = k;
-      o.textContent = REEL.PALETA[k].nombre;
-      sel.appendChild(o);
-    }
-    sel.value = st[campo] || "secondary";
-    sel.addEventListener("change", () => {
-      st[campo] = sel.value;
-      REEL.guardar(st);
-      dibujarQuieto();
-    });
+    marcar();
   }
   enlazarColor(D.colFrase, "colFrase");
   enlazarColor(D.colMarco, "colMarco", true);
@@ -206,32 +243,52 @@
   avisarMarco();
 
   // ------------------------------------------------------------ fondo fijo
-  // Un desplegable con todas las recetas más la opción de que vayan rotando,
-  // que es como estaba antes. Se llena al abrir, no aquí: las fotos que ella
-  // sube entran en la lista y hay que releerlas cada vez.
+  // Miniaturas, no desplegable: un fondo es una imagen y el nombre no dice cómo
+  // queda. Se pintan al abrir, no aquí: las fotos que ella sube entran en la
+  // lista y hay que releerlas cada vez.
   function pintarFondos() {
     if (!D.fondoSel) return;
     const recs = REEL.recetas(st);
     D.fondoSel.textContent = "";
+    const poner = (valor, nombre, pinta) => {
+      const b = document.createElement("button");
+      b.type = "button";
+      b.className = "reel-fondo";
+      b.dataset.valor = valor;
+      b.title = nombre;
+      b.setAttribute("aria-label", nombre);
+      pinta(b);
+      const n = document.createElement("span");
+      n.className = "reel-fondo-n";
+      n.textContent = nombre;
+      b.appendChild(n);
+      b.addEventListener("click", () => {
+        if (valor === "rotar") st.fondoFijo = false;
+        else { st.fondoFijo = true; st.fondoIdx = parseInt(valor, 10) || 0; }
+        REEL.guardar(st);
+        marcar();
+        dibujarQuieto();
+      });
+      D.fondoSel.appendChild(b);
+    };
     recs.forEach((r, i) => {
-      const o = document.createElement("option");
-      o.value = String(i);
-      o.textContent = r.nombre || ("FONDO " + (i + 1));
-      D.fondoSel.appendChild(o);
+      poner(String(i), r.nombre || ("FONDO " + (i + 1)), (b) => {
+        if (r.tipo === "color") { b.style.background = r.v; return; }
+        const im = document.createElement("img");
+        im.src = r.v; im.alt = "";
+        b.appendChild(im);
+      });
     });
-    const rot = document.createElement("option");
-    rot.value = "rotar";
-    rot.textContent = "— uno distinto por diseño —";
-    D.fondoSel.appendChild(rot);
-    D.fondoSel.value = st.fondoFijo === false ? "rotar"
-      : String((st.fondoIdx || 0) % Math.max(1, recs.length));
+    poner("rotar", "ROTAR", (b) => { b.classList.add("reel-fondo-rotar"); });
+    D.fondoSel.lastChild.title = "Un fondo distinto por diseño";
+
+    function marcar() {
+      const v = st.fondoFijo === false ? "rotar"
+        : String((st.fondoIdx || 0) % Math.max(1, recs.length));
+      for (const b of D.fondoSel.children) b.classList.toggle("on", b.dataset.valor === v);
+    }
+    marcar();
   }
-  if (D.fondoSel) D.fondoSel.addEventListener("change", () => {
-    if (D.fondoSel.value === "rotar") { st.fondoFijo = false; }
-    else { st.fondoFijo = true; st.fondoIdx = parseInt(D.fondoSel.value, 10) || 0; }
-    REEL.guardar(st);
-    dibujarQuieto();
-  });
 
   // ---------------------------------------------------------------- ajustes
   function enlazarTexto(el, campo) {
@@ -250,8 +307,78 @@
   D.dur.addEventListener("input", () => {
     st.dur = parseFloat(D.dur.value);
     D.durVal.textContent = st.dur + "s";
+    pintarBarrido();
     REEL.guardar(st);
   });
+
+  // Ritmo al final y cierre con el logo. Los dos cambian la cuenta del ritmo,
+  // asi que se vuelve a montar la previa: si no, se veria la de antes.
+  if (D.lento) {
+    D.lento.value = st.lento;
+    D.lentoVal.textContent = (+st.lento).toFixed(2) + "s";
+    D.lento.addEventListener("input", () => {
+      st.lento = parseFloat(D.lento.value);
+      D.lentoVal.textContent = st.lento.toFixed(2) + "s";
+      REEL.guardar(st);
+      dibujarQuieto();
+    });
+  }
+  // La pasada rápida y la parada. Las dos cambian la cuenta del ritmo, así que
+  // se vuelve a montar la previa.
+  if (D.barrido) {
+    D.barrido.value = st.barrido;
+    pintarBarrido();
+    D.barrido.addEventListener("input", () => {
+      st.barrido = parseFloat(D.barrido.value);
+      pintarBarrido();
+      REEL.guardar(st);
+      dibujarQuieto();
+    });
+  }
+  // Enseñar el tiempo por diseño de la pasada rápida: es el dato que le importa
+  // y depende de cuántos diseños haya puesto, no sólo del mando.
+  function pintarBarrido() {
+    if (!D.barridoVal) return;
+    D.barridoVal.textContent = (+st.barrido).toFixed(1) + "s";
+    if (!D.barridoTip) return;
+    const n = st.ids.length;
+    if (!n) {
+      D.barridoTip.innerHTML = "Lo que tarda en pasar <b>una vez</b> por todos los diseños al principio.";
+      return;
+    }
+    // El barrido no puede comerse todo el giro: reel.js lo recorta al 70%. Si
+    // aquí se enseñara el número del mando y no el recortado, el tiempo por
+    // diseño que pone no sería el que va a ver.
+    const giro = Math.max(1, st.dur - st.parada - (st.cierre || 0));
+    const b = Math.max(0.2, Math.min(+st.barrido, giro * 0.7));
+    const cada = Math.max(st.minInt || 0.03, b / n);
+    D.barridoTip.innerHTML = "Pasa <b>una vez</b> por los " + n + " diseños en "
+      + (cada * n).toFixed(1).replace(".", ",") + "s — "
+      + cada.toFixed(2).replace(".", ",") + "s cada uno."
+      + (b < +st.barrido ? " (recortado: el reel es corto)" : "");
+  }
+  if (D.parada) {
+    D.parada.value = st.parada;
+    D.paradaVal.textContent = (+st.parada).toFixed(1) + "s";
+    D.parada.addEventListener("input", () => {
+      st.parada = parseFloat(D.parada.value);
+      D.paradaVal.textContent = st.parada.toFixed(1) + "s";
+      pintarBarrido();
+      REEL.guardar(st);
+      dibujarQuieto();
+    });
+  }
+  if (D.cierre) {
+    D.cierre.value = st.cierre;
+    D.cierreVal.textContent = (+st.cierre).toFixed(1) + "s";
+    D.cierre.addEventListener("input", () => {
+      st.cierre = parseFloat(D.cierre.value);
+      D.cierreVal.textContent = st.cierre.toFixed(1) + "s";
+      pintarBarrido();
+      REEL.guardar(st);
+      dibujarQuieto();
+    });
+  }
 
   D.vidBtn.addEventListener("click", () => D.vidInput.click());
   D.vidInput.addEventListener("change", () => {

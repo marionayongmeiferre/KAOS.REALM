@@ -1526,8 +1526,9 @@
       </div>
       <aside class="reel-side">
         <div class="tip">
-          Los diseños salen como pegatinas recortadas, cada uno con un fondo distinto.
-          Empieza rapidísimo y va frenando hasta pararse en uno.
+          Los diseños salen como pegatinas recortadas. Primero pasan todos una vez
+          rápido, luego frena para que se vean bien, se para en uno y remata con
+          tu logotipo entero. Caben hasta 50.
         </div>
 
         <div class="section-title">Diseños de la ruleta</div>
@@ -1544,22 +1545,41 @@
         <input type="text" id="reelFrase" maxlength="40" placeholder="Frase de arriba">
         <input type="text" id="reelCta" maxlength="40" placeholder="CTA de abajo" style="margin-top:6px">
         <div class="control-row" style="margin-top:8px"><label>Color de la frase</label></div>
-        <select class="ideas-estilo-sel" id="reelColFrase"></select>
+        <div class="reel-colores" id="reelColFrase"></div>
         <div class="control-row" style="margin-top:6px"><label>Color del marco</label></div>
-        <select class="ideas-estilo-sel" id="reelColMarco"></select>
+        <div class="reel-colores" id="reelColMarco"></div>
         <div class="tip" id="reelMarcoAviso" hidden>Marco y frase del mismo color: el marco deja de enmarcar y compite con el titular.</div>
         <div class="control-row" style="margin-top:6px"><label>Color del CTA</label></div>
-        <select class="ideas-estilo-sel" id="reelColCta"></select>
+        <div class="reel-colores" id="reelColCta"></div>
         <div class="control-row" style="margin-top:6px"><label>Color del logo y el @</label></div>
-        <select class="ideas-estilo-sel" id="reelColHandle"></select>
+        <div class="reel-colores" id="reelColHandle"></div>
 
         <div class="section-title" style="margin-top:14px">Duración</div>
         <div class="control-row"><label>Segundos</label><span class="val" id="reelDurVal">8s</span></div>
         <input type="range" id="reelDur" min="4" max="15" step="1" value="8">
 
+        <div class="control-row" style="margin-top:8px"><label>Pasada rápida</label><span class="val" id="reelBarridoVal">2.4s</span></div>
+        <input type="range" id="reelBarrido" min="0.6" max="6" step="0.2" value="2.4">
+        <div class="tip" id="reelBarridoTip">Lo que tarda en pasar <b>una vez</b> por
+          todos los diseños al principio.</div>
+
+        <div class="control-row" style="margin-top:8px"><label>Ritmo al final</label><span class="val" id="reelLentoVal">0.70s</span></div>
+        <input type="range" id="reelLento" min="0.35" max="1.2" step="0.05" value="0.7">
+        <div class="tip">Cuánto dura cada diseño una vez ha frenado. Por debajo de
+          medio segundo se intuye, no se mira.</div>
+
+        <div class="control-row" style="margin-top:8px"><label>Parada en el ganador</label><span class="val" id="reelParadaVal">1.0s</span></div>
+        <input type="range" id="reelParada" min="0.3" max="3" step="0.1" value="1">
+        <div class="tip">El rato que aguanta el último diseño antes de tu logo.</div>
+
+        <div class="control-row" style="margin-top:8px"><label>Cierre con tu logo</label><span class="val" id="reelCierreVal">1.4s</span></div>
+        <input type="range" id="reelCierre" min="0" max="3" step="0.2" value="1.4">
+        <div class="tip" id="reelCierreAviso">A 0 se quita el cierre. Sale de los
+          segundos totales, así que la ruleta gira ese rato menos.</div>
+
         <div class="section-title" style="margin-top:14px">Fondo</div>
         <div class="control-row"><label>Cuál</label></div>
-        <select class="ideas-estilo-sel" id="reelFondoSel"></select>
+        <div class="reel-fondos" id="reelFondoSel"></div>
         <div class="tip">El fondo se queda quieto todo el reel; lo único que cambia es el diseño.</div>
         <div class="bg-foto-fila">
           <input type="file" id="reelVideoInput" accept="video/*" style="display:none">
