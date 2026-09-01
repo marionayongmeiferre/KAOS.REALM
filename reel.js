@@ -105,19 +105,41 @@
   }
 
   // ---------------------------------------------------------------- ritmo
-  // La ruleta: intervalos que arrancan cortos y se van estirando. Devuelve una
-  // lista de {desde, hasta, slot} en segundos. El último aguanta `parada`.
+  // La ruleta: dos fases y luego el ganador.
+  //   1) Rápida: intervalos que crecen desde minInt (el "whirr" de ruleta).
+  //      Dura al menos una vuelta completa de todos los diseños.
+  //   2) Lenta: UNA vuelta completa de TODOS los diseños, repartiendo a partes
+  //      iguales el tiempo que quede. Antes la desaceleración era continua y se
+  //      cortaba donde pillase: con 8 diseños podía enseñar sólo 6 en la parte
+  //      lenta. Ahora los enseña todos siempre.
   function ritmo(st, nSlots) {
     const pasos = [];
     let t = 0, iv = st.minInt, k = 0;
     const fin = Math.max(1, st.dur - st.parada);
-    while (t < fin && pasos.length < 400) {
+
+    // Fase rápida: al menos una vuelta completa (k < nSlots), y después
+    // sigue mientras los intervalos sean cortos. El umbral marca cuándo la
+    // ruleta ya "va lenta" y es hora de pasar a la vuelta completa.
+    const umbralLento = st.maxInt * 0.3;
+    while (t < fin && (k < nSlots || iv < umbralLento) && pasos.length < 400) {
       const hasta = Math.min(fin, t + iv);
       pasos.push({ desde: t, hasta: hasta, slot: k % nSlots });
       t = hasta;
       k++;
       iv = Math.min(st.maxInt, iv * 1.115);
     }
+
+    // Fase lenta: una vuelta completa de TODOS los diseños.
+    if (t < fin) {
+      const ivLento = (fin - t) / nSlots;
+      for (let j = 0; j < nSlots; j++) {
+        const hasta = Math.min(fin, t + ivLento);
+        pasos.push({ desde: t, hasta: hasta, slot: k % nSlots });
+        t = hasta;
+        k++;
+      }
+    }
+
     // El ganador: el que quede al parar, sostenido hasta el final.
     const ganador = pasos.length ? (pasos[pasos.length - 1].slot + 1) % nSlots : 0;
     pasos.push({ desde: fin, hasta: st.dur, slot: ganador, ganador: true });
