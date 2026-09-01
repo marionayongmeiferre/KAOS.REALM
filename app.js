@@ -2474,15 +2474,24 @@
   if (sheetsTopBtn) sheetsTopBtn.addEventListener("click", openSessionsDialog);
   function openSessionsDialog() {
     const list = KAOS_STORE.sessions();
-    const rows = list.length ? list.map(s => `
+    const galById = new Map(KAOS_GALLERY.load().map(i => [i.id, i]));
+    const rows = list.length ? list.map(s => {
+      const ids = (s.data && s.data.selectedIds) || [];
+      const thumbs = ids.slice(0, 5).map(id => {
+        const it = galById.get(id);
+        return it ? `<img src="${it.thumbUrl || it.layerUrl}" class="kd-thumb">` : "";
+      }).join("");
+      return `
       <div class="kd-row" data-id="${s.id}">
         <div class="kd-row-main">
+          <div class="kd-row-thumbs">${thumbs}</div>
           <div class="kd-row-name">${s.name}</div>
-          <div class="kd-row-meta">${new Date(s.ts).toLocaleString()} · ${(s.data && s.data.selectedIds ? s.data.selectedIds.length : 0)} diseños</div>
+          <div class="kd-row-meta">${new Date(s.ts).toLocaleString()} · ${ids.length} diseños</div>
         </div>
         <button class="icon-btn" data-act="open">ABRIR</button>
         <button class="icon-btn" data-act="del">✕</button>
-      </div>`).join("") : '<div class="kd-body">Aún no has guardado ninguna hoja.</div>';
+      </div>`;
+    }).join("") : '<div class="kd-body">Aún no has guardado ninguna hoja.</div>';
     const kb = pesoHojasKB();
     const back = dialog(`
       <div class="kd-title">Hojas guardadas</div>
@@ -2536,7 +2545,7 @@
     composeState.selectedIndex = null;
     composeState.pairActive = null;
     composeState.sheetMode = false;
-    if (composeState.selectedIds.length < 3) { showToast("Esa hoja ya no tiene suficientes diseños en la galería"); return; }
+    if (composeState.selectedIds.length < 1) { showToast("Esa hoja ya no tiene suficientes diseños en la galería"); return; }
     currentSessionId = s.id; currentSessionName = s.name;
     composeDirty = false;
     galleryModal.style.display = "";
@@ -2740,7 +2749,30 @@
       const label = galleryFilter === "ALL" ? "" : ` · ${galleryFilter.toUpperCase()}`;
       gallerySubtitle.textContent = items.length + " item" + (items.length === 1 ? "" : "s") + label;
     }
-    for (const it of items) {
+    let renderOrder = items;
+    if (galleryFilter === "ALL" && items.length) {
+      const groups = new Map();
+      for (const it of items) {
+        const cat = (it.style || "").trim() || "SIN CARPETA";
+        if (!groups.has(cat)) groups.set(cat, []);
+        groups.get(cat).push(it);
+      }
+      const sorted = Array.from(groups.entries()).sort((a, b) => a[0].localeCompare(b[0]));
+      renderOrder = [];
+      for (const [cat, catItems] of sorted) {
+        renderOrder.push({ _header: cat, _count: catItems.length });
+        for (const it of catItems) renderOrder.push(it);
+      }
+    }
+    for (const entry of renderOrder) {
+      if (entry._header) {
+        const h = document.createElement("div");
+        h.className = "gallery-cat-header";
+        h.textContent = entry._header.toUpperCase() + " (" + entry._count + ")";
+        galleryGrid.appendChild(h);
+        continue;
+      }
+      const it = entry;
       const card = document.createElement("div");
       card.className = "gallery-card";
       card.dataset.id = it.id;
@@ -2768,7 +2800,6 @@
       `;
       card.addEventListener("click", (e) => {
         if (e.target.closest(".cm-tag")) return;
-        // El chip marca/desmarca la etiqueta; no debe seleccionar el diseño.
         const chip = e.target.closest(".tag-chip");
         if (chip) {
           e.stopPropagation();
@@ -2857,7 +2888,7 @@
     });
   }
   composeBtn.addEventListener("click", () => {
-    if (composeState.selectedIds.length < 3) return;
+    if (composeState.selectedIds.length < 1) return;
     galleryView.style.display = "none";
     composeView.style.display = "";
     composeState.selectedIndex = null;
@@ -4547,9 +4578,7 @@
     renderCompose();
   });
   function endDrag() {
-    if (drag.active && drag.moved && composeState.placements.length > 1) {
-      // Only nudge neighbours the dragged piece actually overlaps — every other
-      // piece stays exactly where it was.
+    if (drag.active && drag.moved && composeState.placements.length > 1 && composeState.layout !== "manual") {
       KAOS_GALLERY.nudgeAround(composeState.placements, drag.idx, sheetRegion(), sheetGap());
       composeDirty = true;
       renderCompose();
@@ -4718,7 +4747,7 @@
     }
     composeState.selectedIds.splice(idx, 1);
     composeState.selectedIndex = null;
-    if (composeState.selectedIds.length < 3) {
+    if (composeState.selectedIds.length < 1) {
       // bounce back to gallery
       composeView.style.display = "none";
       galleryView.style.display = "";
@@ -4904,14 +4933,13 @@
   });
   function relaxAfterResize() {
     if (!gizmoDrag || gizmoDrag.mode !== "scale") return;
+    if (composeState.layout === "manual") { gizmoDrag = null; return; }
     const ps = editPlacements();
     const region = KAOS_GALLERY.usableRegion({
       width: composeState.width, height: composeState.height, bleed: composeState.bleed,
       title: composeState.title, handle: composeState.handle, footer: composeState.footer,
     });
     const gap = sheetGap();
-    // Only nudge neighbours that actually overlap the just-scaled piece.
-    // Every other piece stays exactly where it was; layout mode is untouched.
     KAOS_GALLERY.nudgeAround(ps, gizmoDrag.idx, region, gap);
     composeDirty = true;
     gizmoDrag = null;

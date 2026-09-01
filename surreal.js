@@ -308,11 +308,20 @@
     if (!window.KAOS_APP || !KAOS_APP.previewSurrealStyle) return;
     if (!S.elements.length) { estiloLienzo = null; return; }
     try {
-      // 900 px de lado: se ve nítido en pantalla y se calcula rápido. El
-      // export final no sale de aquí — para eso está PASAR AL LIENZO, que
-      // trabaja a resolución completa.
-      const hecho = await KAOS_APP.previewSurrealStyle(bakeMergedCanvas(), 900, elementMasks());
+      const hasResources = S.elements.some(e => e.isResource);
+      const base = hasResources ? bakeMergedCanvas("no-resources") : bakeMergedCanvas();
+      const hecho = await KAOS_APP.previewSurrealStyle(base, 900, elementMasks());
       if (!hecho) return;
+      if (hasResources) {
+        const res = bakeMergedCanvas("resources");
+        const rW = hecho.width, rH = hecho.height;
+        const sX = rW / S.W, sY = rH / S.H;
+        const rc = document.createElement("canvas");
+        rc.width = rW; rc.height = rH;
+        const rctx = rc.getContext("2d");
+        rctx.drawImage(res, 0, 0, rW, rH);
+        hecho.getContext("2d").drawImage(rc, 0, 0);
+      }
       estiloLienzo = hecho;
       render();
     } catch (e) { console.warn("no se pudo pintar el collage con estilo", e); }
@@ -592,20 +601,18 @@
     const blob = await new Promise((res) => copia.toBlob(res, "image/png"));
     copia.width = copia.height = 1;
     if (!blob) return;
-    await addFiles([new File([blob], (nombre || "mandala") + ".png", { type: "image/png" })]);
+    await addFiles([new File([blob], (nombre || "mandala") + ".png", { type: "image/png" })], { isResource: true });
   }
 
-  async function addFiles(files) {
+  async function addFiles(files, opts) {
     if (files.length > 0) pushSurrealUndo();
-    for (const f of files) await addFile(f);
+    for (const f of files) await addFile(f, opts);
     render();
     renderLayerList();
     updateEmpty();
-    // Sin esto, si ya habia un lienzo con estilo pintado, la pieza nueva no
-    // salia: se seguia repintando el montaje de antes.
     scheduleLivePreview();
   }
-  function addFile(file) {
+  function addFile(file, opts) {
     return new Promise((resolve) => {
       const url = URL.createObjectURL(file);
       const img = new Image();
@@ -641,6 +648,7 @@
           feather: 2,
           tolerance: 30,
           _thumb: null,
+          isResource: !!(opts && opts.isResource),
         };
         S.elements.push(e);
         S.order.push(S.elements.length - 1);
@@ -1469,18 +1477,19 @@
   }
 
   // ---------- finish / send to main ----------
-  function bakeMergedCanvas() {
+  function bakeMergedCanvas(filter) {
     const out = document.createElement("canvas");
     out.width = S.W; out.height = S.H;
     const ctx = out.getContext("2d");
-    // background: if paper requested, paint; if transparent, leave clear
-    if (S.bg === "paper") {
+    if (S.bg === "paper" && filter !== "resources") {
       if (window.KAOS_GALLERY && KAOS_GALLERY.paintPaperSeeded) KAOS_GALLERY.paintPaperSeeded(ctx, S.W, S.H, "#d9d4c8", 7);
       else { ctx.fillStyle = "#d9d4c8"; ctx.fillRect(0, 0, S.W, S.H); }
     }
     for (const idx of S.order) {
       const e = S.elements[idx];
       if (!e) continue;
+      if (filter === "no-resources" && e.isResource) continue;
+      if (filter === "resources" && !e.isResource) continue;
       const rc = getRenderCanvas(e);
       ctx.save();
       ctx.globalAlpha = e.opacity;
@@ -1571,7 +1580,6 @@
 
     async function renderResourceGrid() {
       resourceGrid.innerHTML = "";
-      if (activeCat === "galeria") return renderGaleriaGrid();
       const rows = window.KAOS_STORE ? await KAOS_STORE.listAssets(activeCat) : [];
       if (!rows.length) {
         resourceGrid.innerHTML =
@@ -1618,27 +1626,19 @@
       if (!img.naturalWidth) return;
       const maxDim = 600;
       let w = img.naturalWidth, h = img.naturalHeight;
-      // SVGs may report tiny/zero sizes — force a good canvas size
       if (url.endsWith(".svg") && (w < 50 || h < 50)) { w = maxDim; h = maxDim; }
       if (w > maxDim || h > maxDim) { const s = maxDim / Math.max(w, h); w = Math.round(w * s); h = Math.round(h * s); }
       const c = document.createElement("canvas");
       c.width = w; c.height = h;
       c.getContext("2d").drawImage(img, 0, 0, w, h);
-      // Convert to blob and feed into the existing addFiles pipeline
       const blob = await new Promise(r => c.toBlob(r, "image/png"));
       const file = new File([blob], "resource.png", { type: "image/png" });
-      await addFiles([file]);
+      await addFiles([file], { isResource: true });
     }
 
     resourceTabs.forEach(btn => btn.addEventListener("click", () => {
       resourceTabs.forEach(b => b.setAttribute("aria-selected", b === btn));
       activeCat = btn.dataset.cat;
-      // «+ ADD TO CATEGORY» sube a la libreria de recursos. En la galeria no
-      // pinta nada: alli se guarda desde el lienzo, no desde aqui.
-      const enGaleria = activeCat === "galeria";
-      if (resourceUploadBtn) resourceUploadBtn.hidden = enGaleria;
-      const mandalasBtn = document.getElementById("composeMandalaBtn");
-      if (mandalasBtn) mandalasBtn.hidden = enGaleria;
       renderResourceGrid();
     }));
 
@@ -2075,6 +2075,7 @@
     for (const idx of S.order) {
       const e = S.elements[idx];
       if (!e) continue;
+      if (e.isResource) continue;
       const c = document.createElement("canvas");
       c.width = S.W; c.height = S.H;
       const ctx = c.getContext("2d");

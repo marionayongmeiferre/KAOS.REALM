@@ -1,7 +1,7 @@
 // KAOS.REALM — backup file (cross-device) + saved flash-sheet sessions
 (function (root) {
   const SESS_KEY = "kaos.sheets.v1";
-  const MAX_SESS = 20;
+  const MAX_SESS = 50;
 
   function sessions() {
     try { return JSON.parse(localStorage.getItem(SESS_KEY) || "[]"); } catch (e) { return []; }
