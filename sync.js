@@ -128,6 +128,15 @@
       return { pushed, pulled, removed, gallery: (merged.gallery || []).length };
     } catch (e) {
       state.lastError = e && e.message ? e.message : String(e);
+      // Si el servidor no existe (GitHub Pages, hosting estático) y nunca hemos
+      // sincronizado con éxito, desactivar sync para esta sesión en vez de
+      // insistir cada vez que toca la galería.
+      if (!state.lastOk && /404|Failed to fetch|NetworkError|Load failed/i.test(state.lastError)) {
+        state.enabled = false;
+        const btn = document.getElementById("syncBtn");
+        if (btn) btn.hidden = true;
+        emit();
+      }
       if (!quiet && root.KAOS_TOAST) KAOS_TOAST("Sync falló: " + state.lastError, 5000);
       throw e;
     } finally {
