@@ -22,14 +22,15 @@
   const K_EST = "kaos.reel.v1";
   // Sube cuando cambia un valor por defecto que ya tenía guardado: si no, el
   // ajuste viejo de su localStorage gana y parece que el cambio no ha entrado.
-  const VERSION = 2;
+  const VERSION = 3;
 
   // ---------------------------------------------------------------- estado
   const POR_DEFECTO = {
     ids: [],                 // diseños elegidos, en orden
     frase: "¿CUÁL TE TOCA?",
     cta: "PÁRALO Y ESCRÍBEME",
-    dur: 8,                  // segundos totales
+    // Ya no hay `dur`: la duracion la calcula `duracion()` a partir de cuantos
+    // diseños haya y del ritmo. Ver el comentario de `ritmo`.
     // Cuánto aguanta el ganador antes del logo. Estaba en 2,2 s y se hacía un
     // hueco muerto entre el último diseño y el cierre: se para, y ahí quieto,
     // y el ojo ya se ha ido. Un segundo es suficiente para leer el diseño.
@@ -114,6 +115,8 @@
           st.barrido = POR_DEFECTO.barrido;
           st.minInt = POR_DEFECTO.minInt;
         }
+        // v3: la duracion se calcula. La que tuviera guardada ya no pinta nada.
+        if ((j.v || 1) < 3) delete st.dur;
         st.v = VERSION;
         return st;
       }
@@ -130,75 +133,66 @@
   }
 
   // ---------------------------------------------------------------- ritmo
-  // La ruleta tiene tres tramos:
-  //   1) BARRIDO — pasan todos los diseños una vez, rápido. Dura exactamente
-  //      lo que diga `barrido`, así que el intervalo sale de dividir ese
-  //      tiempo entre cuántos diseños hay. Ella pone el total y ya está.
-  //   2) FRENADA — a partir de ahí el intervalo crece hasta el ritmo lento.
-  //   3) MIRADA  — se queda en el ritmo lento hasta pararse en el ganador.
+  // La ruleta tiene DOS pasadas completas, y las dos enseñan TODOS los diseños:
+  //   1) PASADA RÁPIDA — todos, una vez, en el tiempo que diga `barrido`.
+  //   2) FRENADA — cinco escalones para que no dé el salto de golpe.
+  //   3) PASADA LENTA — todos otra vez, a `lento` (0,7 s) cada uno.
+  //   4) GANADOR — se para en uno, y el remate con el logotipo.
   //
-  // Antes no había tramo 1: el intervalo crecía un 11,5% por paso desde el
-  // principio y con 8 s de reel no llegaba a 0,7 s hasta el final. Todo era un
-  // borrón. Y el barrido no se podía medir: dependía de cuántos diseños hubiera.
+  // Antes la pasada lenta duraba lo que sobrara del reel, así que sólo le daba
+  // tiempo a enseñar unos pocos: con 20 diseños se veían 4. Ahora es al revés
+  // — la pasada lenta enseña los que haya y la duración del reel SALE de ahí.
+  // Por eso ya no hay mando de segundos: el total se calcula y se enseña.
   //
   // Devuelve una lista de {desde, hasta, slot} en segundos.
+  const ESCALONES = 5;   // pasos de frenada entre la pasada rápida y la lenta
+
   function ritmo(st, nSlots) {
     const pasos = [];
+    const n = Math.max(1, nSlots);
     const cierre = Math.max(0, st.cierre || 0);
-    const fin = Math.max(1, st.dur - st.parada - cierre);
+    const parada = Math.max(0.2, st.parada || 1);
     const lento = Math.max(0.05, Math.min(st.lento || 0.7, st.maxInt || 0.85));
-
-    // El barrido no puede comerse todo el giro: si lo hiciera no quedaría sitio
-    // para frenar y no se vería ni un diseño quieto. Se le deja como mucho el
-    // 70% y el resto es la frenada.
-    const barrido = Math.max(0.2, Math.min(st.barrido || 2.4, fin * 0.7));
-    const ivRapido = Math.max(st.minInt || 0.03, barrido / Math.max(1, nSlots));
+    const barrido = Math.max(0.2, st.barrido || 2.4);
+    const ivRapido = Math.max(st.minInt || 0.03, barrido / n);
 
     let t = 0, k = 0;
-    // 1) el barrido: nSlots pasos iguales, todos los diseños una vez.
-    for (let i = 0; i < nSlots && t < fin; i++) {
-      const hasta = Math.min(fin, t + ivRapido);
-      pasos.push({ desde: t, hasta: hasta, slot: k % nSlots });
-      t = hasta; k++;
-    }
+    const meter = (iv) => {
+      pasos.push({ desde: t, hasta: t + iv, slot: k % n });
+      t += iv; k++;
+    };
 
-    // 2) la frenada. Se busca a tientas el factor por paso que lleva de
-    // `ivRapido` a `lento` justo en la mitad de lo que queda de giro. Despejarlo
-    // a mano sale una ecuación fea y esto son 40 vueltas de nada.
-    const resto = Math.max(0, fin - t);
-    const frena = Math.max(0.3, resto * 0.5);
-    let f = 1.2;
+    // 1) pasada rápida: todos una vez.
+    for (let i = 0; i < n; i++) meter(ivRapido);
+
+    // 2) frenada. Escalones repartidos a partes iguales en proporción, que es
+    // como frena algo de verdad: no en saltos iguales sino cada vez menos.
     if (ivRapido < lento) {
-      const tardaEn = (x) => {
-        let acc = 0, iv = ivRapido, n = 0;
-        while (iv < lento && n < 500) { acc += iv; iv *= x; n++; }
-        return acc;
-      };
-      let lo = 1.005, hi = 3.0;
-      for (let i = 0; i < 40; i++) {
-        const m = (lo + hi) / 2;
-        if (tardaEn(m) > frena) lo = m; else hi = m;   // frena poco -> más factor
-      }
-      f = (lo + hi) / 2;
+      const f = Math.pow(lento / ivRapido, 1 / (ESCALONES + 1));
+      let iv = ivRapido;
+      for (let i = 0; i < ESCALONES; i++) { iv *= f; meter(iv); }
     }
 
-    // 3) frenada y mirada, en el mismo bucle: al llegar a `lento` se queda ahí.
-    let iv = Math.min(lento, ivRapido * f);
-    while (t < fin && pasos.length < 600) {
-      const hasta = Math.min(fin, t + iv);
-      pasos.push({ desde: t, hasta: hasta, slot: k % nSlots });
-      t = hasta; k++;
-      iv = Math.min(lento, iv * f);
-    }
+    // 3) pasada lenta: todos otra vez, a ritmo de mirarlos.
+    for (let i = 0; i < n; i++) meter(lento);
 
-    // El ganador: el que quede al parar, sostenido hasta el cierre.
-    const ganador = pasos.length ? (pasos[pasos.length - 1].slot + 1) % nSlots : 0;
-    pasos.push({ desde: fin, hasta: st.dur - cierre, slot: ganador, ganador: true });
+    // 4) el ganador: el siguiente al último, sostenido hasta el cierre.
+    const fin = t;
+    const ganador = k % n;
+    pasos.push({ desde: fin, hasta: fin + parada, slot: ganador, ganador: true });
     // Y el remate: su logotipo entero, a pantalla completa.
     if (cierre > 0) {
-      pasos.push({ desde: st.dur - cierre, hasta: st.dur, slot: ganador, cierre: true });
+      pasos.push({ desde: fin + parada, hasta: fin + parada + cierre, slot: ganador, cierre: true });
     }
     return pasos;
+  }
+
+  // Cuánto dura el reel entero. Ya no lo elige ella: sale de cuántos diseños
+  // haya y de a qué ritmo quiera verlos. El panel lo enseña para que no sea
+  // una sorpresa al darle a grabar.
+  function duracion(st, nSlots) {
+    const p = ritmo(st, nSlots);
+    return p.length ? p[p.length - 1].hasta : 0;
   }
   function slotEn(pasos, t) {
     for (let i = pasos.length - 1; i >= 0; i--) if (t >= pasos[i].desde) return pasos[i];
@@ -542,7 +536,12 @@
     // Se carga aunque haya quitado el logo del pie: el cierre lo necesita igual.
     const logo = (st.logo === false && !(st.cierre > 0))
       ? null : await cargarImg("uploads/kaos_logo.PNG");
-    return { st: st, slots: slots, pasos: ritmo(st, Math.max(1, slots.length)), video: video, logo: logo };
+    const pasos = ritmo(st, Math.max(1, slots.length));
+    // La duracion viaja con las piezas: la calcula `ritmo` y todo lo que pinta
+    // o graba la lee de aqui. Si cada sitio la volviera a calcular a su manera,
+    // la previa y la grabacion acabarian durando cosas distintas.
+    const dur = pasos.length ? pasos[pasos.length - 1].hasta : 0;
+    return { st: st, slots: slots, pasos: pasos, dur: dur, video: video, logo: logo };
   }
 
   // ---------------------------------------------------------------- previa
@@ -555,8 +554,8 @@
     (function paso() {
       if (!vivo) return;
       const t = (performance.now() - t0) / 1000;
-      if (t >= piezas.st.dur) {
-        pintarFrame(ctx, piezas, piezas.st.dur - 0.01);
+      if (t >= piezas.dur) {
+        pintarFrame(ctx, piezas, piezas.dur - 0.01);
         vivo = false;
         if (piezas.video) piezas.video.pause();
         if (alAcabar) alAcabar();
@@ -617,7 +616,7 @@
       // Se pinta a reloj de pared, no fotograma a fotograma: `captureStream`
       // muestrea el canvas en tiempo real, así que el vídeo dura lo que dura la
       // grabación. Es la razón de que grabar 8 segundos tarde 8 segundos.
-      const dur = piezas.st.dur;
+      const dur = piezas.dur;
       if (piezas.video) { try { piezas.video.currentTime = 0; piezas.video.play(); } catch (e) {} }
       rec.start();
       const t0 = performance.now();
@@ -640,7 +639,7 @@
     recetas,
     W: W, H: H,
     estado: estado, guardar: guardar, POR_DEFECTO: POR_DEFECTO,
-    ritmo: ritmo, preparar: preparar, pintarFrame: pintarFrame,
+    ritmo: ritmo, duracion: duracion, preparar: preparar, pintarFrame: pintarFrame,
     previsualizar: previsualizar, grabar: grabar, mejorFormato: mejorFormato,
     PALETA: PALETA, color: color,
   };

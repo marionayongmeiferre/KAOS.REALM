@@ -692,6 +692,19 @@ input[type="file"] { display: none; }
   padding-right: 2px;
 }
 
+/* La duracion ya no se elige, se calcula. Se enseña grande porque es el dato
+   que decide si el reel vale para Instagram o se le va de largo. */
+.reel-total {
+  display: flex; align-items: baseline; justify-content: space-between;
+  gap: 8px; padding: 8px 10px; margin-top: 4px;
+  background: rgba(10, 9, 8, 0.55);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 2px;
+}
+.reel-total span { font-size: 11px; letter-spacing: .06em; opacity: .75; }
+.reel-total b { font-size: 20px; font-weight: 800; color: #d4ff2f; }
+.reel-total.largo b { color: #ff6b5c; }
+
 /* Colores a golpe de vista, no en desplegable: un desplegable obliga a leer el
    nombre del color y a imaginárselo. Aquí se ve. */
 .reel-colores { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 4px; }

@@ -28,8 +28,8 @@
     fondoSel: $("#reelFondoSel"),
     frase:    $("#reelFrase"),
     cta:      $("#reelCta"),
-    dur:      $("#reelDur"),
     durVal:   $("#reelDurVal"),
+    durTip:   $("#reelDurTip"),
     lento:    $("#reelLento"),
     lentoVal: $("#reelLentoVal"),
     barrido:  $("#reelBarrido"),
@@ -112,7 +112,7 @@
     // ahora es el cierre con el logo, y de previa taparia el encuadre del
     // diseno, que es justo lo que ella esta mirando al montar la ruleta.
     const cierre = st.cierre > 0 ? st.cierre : 0;
-    REEL.pintarFrame(D.canvas.getContext("2d"), piezas, st.dur - cierre - 0.01);
+    REEL.pintarFrame(D.canvas.getContext("2d"), piezas, piezas.dur - cierre - 0.01);
   }
 
   // ---------------------------------------------------------------- elegir
@@ -302,15 +302,6 @@
   enlazarTexto(D.frase, "frase");
   enlazarTexto(D.cta, "cta");
 
-  D.dur.value = st.dur;
-  D.durVal.textContent = st.dur + "s";
-  D.dur.addEventListener("input", () => {
-    st.dur = parseFloat(D.dur.value);
-    D.durVal.textContent = st.dur + "s";
-    pintarBarrido();
-    REEL.guardar(st);
-  });
-
   // Ritmo al final y cierre con el logo. Los dos cambian la cuenta del ritmo,
   // asi que se vuelve a montar la previa: si no, se veria la de antes.
   if (D.lento) {
@@ -319,6 +310,7 @@
     D.lento.addEventListener("input", () => {
       st.lento = parseFloat(D.lento.value);
       D.lentoVal.textContent = st.lento.toFixed(2) + "s";
+      pintarBarrido();
       REEL.guardar(st);
       dibujarQuieto();
     });
@@ -335,27 +327,37 @@
       dibujarQuieto();
     });
   }
-  // Enseñar el tiempo por diseño de la pasada rápida: es el dato que le importa
-  // y depende de cuántos diseños haya puesto, no sólo del mando.
+  // Los dos textos que dependen de cuántos diseños haya: cuánto le toca a cada
+  // uno en la pasada rápida, y cuánto dura el reel entero.
   function pintarBarrido() {
-    if (!D.barridoVal) return;
-    D.barridoVal.textContent = (+st.barrido).toFixed(1) + "s";
-    if (!D.barridoTip) return;
     const n = st.ids.length;
-    if (!n) {
-      D.barridoTip.innerHTML = "Lo que tarda en pasar <b>una vez</b> por todos los diseños al principio.";
-      return;
+    if (D.barridoVal) D.barridoVal.textContent = (+st.barrido).toFixed(1) + "s";
+    if (D.barridoTip) {
+      D.barridoTip.innerHTML = n
+        ? "Pasa <b>una vez</b> por los " + n + " diseños en " + (+st.barrido).toFixed(1)
+          + "s — " + coma(Math.max(st.minInt || 0.03, st.barrido / n), 2) + "s cada uno."
+        : "Lo que tarda en pasar <b>una vez</b> por todos los diseños al principio.";
     }
-    // El barrido no puede comerse todo el giro: reel.js lo recorta al 70%. Si
-    // aquí se enseñara el número del mando y no el recortado, el tiempo por
-    // diseño que pone no sería el que va a ver.
-    const giro = Math.max(1, st.dur - st.parada - (st.cierre || 0));
-    const b = Math.max(0.2, Math.min(+st.barrido, giro * 0.7));
-    const cada = Math.max(st.minInt || 0.03, b / n);
-    D.barridoTip.innerHTML = "Pasa <b>una vez</b> por los " + n + " diseños en "
-      + (cada * n).toFixed(1).replace(".", ",") + "s — "
-      + cada.toFixed(2).replace(".", ",") + "s cada uno."
-      + (b < +st.barrido ? " (recortado: el reel es corto)" : "");
+    pintarTotal(n);
+  }
+  function coma(x, d) { return x.toFixed(d).replace(".", ","); }
+
+  function pintarTotal(n) {
+    if (!D.durVal) return;
+    if (!n) { D.durVal.textContent = "—"; return; }
+    const total = REEL.duracion(st, n);
+    D.durVal.textContent = coma(total, 1) + "s";
+    // Instagram corta los reels en 90 s. Es el único límite duro que hay aquí,
+    // así que se avisa en vez de dejar que lo descubra al subirlo.
+    const caja = D.durVal.parentElement;
+    if (caja) caja.classList.toggle("largo", total > 90);
+    if (!D.durTip) return;
+    D.durTip.innerHTML = total > 90
+      ? "<b>Pasa de 90s y a Instagram no le vale.</b> Quita diseños, baja el "
+        + "«Ritmo al final» o acorta la parada."
+      : n + " rápidos + " + n + " despacio a " + coma(st.lento, 2) + "s"
+        + " + " + coma(st.parada, 1) + "s parado"
+        + (st.cierre > 0 ? " + " + coma(st.cierre, 1) + "s de logo" : "") + ".";
   }
   if (D.parada) {
     D.parada.value = st.parada;
@@ -442,10 +444,10 @@
     const etiqueta = D.recBtn.textContent;
     try {
       const piezas = await REEL.preparar(st, list);
-      decir("Grabando… tarda lo que dura el reel (" + st.dur + "s). No cambies de pestaña.");
+      decir("Grabando… tarda lo que dura el reel (" + coma(piezas.dur, 1) + "s). No cambies de pestaña.");
       const out = await REEL.grabar(piezas, (p) => {
         D.recBtn.textContent = "GRABANDO " + Math.round(p * 100) + "%";
-        REEL.pintarFrame(D.canvas.getContext("2d"), piezas, p * st.dur);
+        REEL.pintarFrame(D.canvas.getContext("2d"), piezas, p * piezas.dur);
       });
       const nombre = "kaos-realm_reel_" + Date.now() + "." + out.ext;
       // "Guardar como" de Windows si el navegador lo tiene; si no, a Descargas
