@@ -1,0 +1,1660 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="kaos-app" content="flash">
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>KAOS.REALM — Tattoo Style Transformer</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Anton&family=Bebas+Neue&family=Cinzel:wght@500;700&family=Italianno&family=JetBrains+Mono:wght@400;500;700&family=Permanent+Marker&family=Pirata+One&family=Rye&family=Special+Elite&family=UnifrakturCook:wght@700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="styles.css?v=55" />
+</head>
+<body style="background-color: rgb(15, 12, 10)">
+<div class="app">
+  <!-- =================== SIDEBAR =================== -->
+  <aside class="side">
+    <div class="brand-logo-wrap">
+      <img src="uploads/kaos_logo.PNG" class="brand-logo" alt="KAOS">
+    </div>
+    <div class="brand">KAOS<span class="dot">.</span>REALM</div>
+    <div class="brand-sub">@kaos.realm · tattoo style transformer</div>
+
+    <!-- ============ LANZADOR DE HERRAMIENTAS ============
+         Fuera de las pestañas a propósito: POST EDIT, IDEAS, CARRUSEL, REEL y
+         MANDALAS no son ajustes del dibujo, son programas aparte. Estaban
+         metidos dentro del panel de STYLE, que los ponía un escalón por debajo
+         de lo que son y encima tapaban los mandos de estilo. Aquí van en una
+         tira compacta, siempre a mano y sin estorbar. -->
+    <div class="lanzador" id="lanzador">
+      <button class="lz" id="postEditOpenBtn" title="POST EDIT — recorta el fondo, neón, logo y exporta">POST</button>
+      <button class="lz" id="ideasOpenBtn" title="IDEAS — peticiones, 5 ideas, referencias y precio">IDEAS<span class="ideas-cta-badge" id="ideasCtaBadge" hidden>0</span></button>
+      <button class="lz" id="carruselOpenBtn" title="CARRUSEL — carruseles y portadas de post o de reel, listos para Instagram">CARRUSEL</button>
+      <button class="lz" id="reelOpenBtn" title="REEL RULETA — tus flash como pegatinas, va frenando, 1080×1920">REEL</button>
+      <button class="lz" id="mandalaOpenBtn" title="MINI MANDALAS — ornamentos pequeños a montones, para flash day">MANDALAS</button>
+      <button class="lz" id="scanOpenBtn" title="ESCANEAR LIBRETA — pasa una foto de tu libreta a diseños sueltos">LIBRETA</button>
+      <!-- Escondido: el collage ya vive en la pestaña COMPOSE. El nodo se queda
+           porque surreal.js le puso un listener al arrancar. -->
+      <button id="surrealOpenBtn" hidden style="display:none"></button>
+    </div>
+
+    <div class="side-tabs" id="sideTabs">
+      <button class="side-tab" data-tab="style" aria-selected="true">STYLE</button>
+      <button class="side-tab" data-tab="finish">FINISH</button>
+      <button class="side-tab" data-tab="mask">MASK</button>
+      <button class="side-tab" data-tab="paper">PAPER</button>
+    </div>
+    <div class="side-scroll">
+    <div class="side-panel" data-panel="style">
+
+    <!-- ============ COMPOSE ============
+         Va DENTRO de style y ANTES que los mandos de estilo, no en una pestaña
+         aparte. Ella lo dijo claro: montar el collage y ajustar el estilo son
+         una sola faena, no dos. Con dos pestañas había que ir y volver, y sobre
+         todo no se veía a la vez lo que estabas haciendo.
+         Ahora el lienzo enseña el collage YA PASADO POR EL ESTILO, y encima se
+         siguen pudiendo arrastrar las piezas: se mueve la foto y se ve al
+         momento cómo queda con el estilo puesto.
+         Esta sección sólo aparece cuando hay algo que componer. -->
+    <div id="composeSeccion">
+
+        <!-- Botonera retirada: ADD ELEMENT lo hace ya el doble clic en el lienzo,
+             deshacer y rehacer son Ctrl+Z y Ctrl+Alt+Z, y VOLVER AL LIENZO no
+             lleva a ninguna parte porque el lienzo del collage ES el principal.
+             Los nodos siguen aquí, escondidos, porque surreal.js les engancha
+             escuchadores al arrancar y si no existen se cae el módulo entero. -->
+        <div class="modal-actions">
+          <input type="file" id="surrealAddInput" accept="image/*" multiple style="display:none">
+          <button class="icon-btn" id="surrealAddBtn" hidden>+ ADD ELEMENT</button>
+          <button class="icon-btn ai" id="surrealAiComposeBtn" hidden>✨ AI AUTO-COMPOSE</button>
+          <button class="icon-btn" id="surrealMatchBtn">MATCH SCENE</button>
+          <button class="icon-btn" id="surrealUndoBtn" hidden disabled title="Ctrl+Z">↶</button>
+          <button class="icon-btn" id="surrealRedoBtn" hidden disabled title="Ctrl+Alt+Z">↷</button>
+          <button class="icon-btn" id="surrealClearBtn" hidden>CLEAR</button>
+          <button class="icon-btn" id="surrealCloseBtn" hidden>← VOLVER AL LIENZO</button>
+        </div>
+        <aside class="surreal-side">
+          <!-- Tamaño y fondo se mudaron a la pestaña PAPER: son decisiones del
+               soporte, no del estilo del dibujo. -->
+  
+          <div class="section-title">Recursos</div>
+          <div class="resource-tabs" id="resourceTabs">
+            <button class="tog" data-cat="galeria">Galería</button>
+            <button class="tog" data-cat="eyes" aria-selected="true">Eyes</button>
+            <button class="tog" data-cat="mouths">Mouths</button>
+            <button class="tog" data-cat="cyber">Cyber</button>
+            <button class="tog" data-cat="ornaments">Ornaments</button>
+            <button class="tog" data-cat="skulls">Skulls</button>
+            <button class="tog" data-cat="flora">Flora</button>
+            <button class="tog" data-cat="geometric">Geometric</button>
+          </div>
+          <div class="resource-grid" id="resourceGrid"></div>
+          <div class="resource-upload-row">
+            <input type="file" id="resourceUploadInput" accept="image/*,image/svg+xml" multiple style="display:none">
+            <button class="icon-btn wide" id="resourceUploadBtn">+ ADD TO CATEGORY</button>
+            <button class="icon-btn wide" id="composeMandalaBtn" style="margin-top:6px">+ DESDE MINI MANDALAS</button>
+          </div>
+  
+          <div class="rule"></div>
+  
+          <div class="section-title">Layers <span class="hint" id="surrealLayerCount">0</span></div>
+          <div class="surreal-layers" id="surrealLayers"></div>
+  
+          <div class="rule"></div>
+  
+          <div id="surrealElementPanel" style="display:none">
+            <div class="section-title">Selected element <span class="hint" id="surrealElementHint">—</span></div>
+            <div class="control">
+              <div class="control-row"><label>Scale</label><span class="val" id="surrealScaleVal">1.00</span></div>
+              <input type="range" id="surrealScale" min="0.1" max="4" step="0.01" value="1.00">
+            </div>
+            <div class="control">
+              <div class="control-row"><label>Rotation</label><span class="val" id="surrealRotVal">0°</span></div>
+              <input type="range" id="surrealRot" min="-180" max="180" step="1" value="0">
+            </div>
+            <div class="control">
+              <div class="control-row"><label>Opacity</label><span class="val" id="surrealOpVal">1.00</span></div>
+              <input type="range" id="surrealOp" min="0.05" max="1" step="0.01" value="1.00">
+            </div>
+            <div class="control">
+              <div class="control-row"><label>Edge feather</label><span class="val" id="surrealFeatherVal">2</span></div>
+              <input type="range" id="surrealFeather" min="0" max="20" step="1" value="2">
+            </div>
+  
+            <div class="section-title" style="margin-top:6px">Teñir esta foto</div>
+            <div class="toggle-row four" id="surrealTinte">
+              <button class="tog" data-tinte="" aria-selected="true">Sin teñir</button>
+              <button class="tog" data-tinte="rojo">Rojo</button>
+              <button class="tog" data-tinte="magenta">Magenta</button>
+              <button class="tog" data-tinte="lima">Lima</button>
+            </div>
+
+            <div class="section-title" style="margin-top:6px">Blend</div>
+            <div class="toggle-row four" id="surrealBlend">
+              <button class="tog" data-blend="source-over" aria-selected="true">Normal</button>
+              <button class="tog" data-blend="multiply">Mult.</button>
+              <button class="tog" data-blend="screen">Screen</button>
+              <button class="tog" data-blend="overlay">Overlay</button>
+            </div>
+  
+            <details class="plegable">
+            <summary>Recortar el fondo</summary>
+            <div class="control">
+              <div class="control-row"><label>Tolerance</label><span class="val" id="surrealTolVal">30</span></div>
+              <input type="range" id="surrealTol" min="3" max="120" value="30">
+            </div>
+            <button class="icon-btn wide" id="surrealAutoCut">AUTO FROM CORNERS</button>
+            <div class="toggle-row three" id="surrealCutTool" style="margin-top:8px">
+              <button class="tog" data-tool="none" aria-selected="true">Mover</button>
+              <button class="tog" data-tool="flood">Click</button>
+              <button class="tog" data-tool="lassoCut">Lazo quitar</button>
+              <button class="tog" data-tool="lasso">Lazo dejar</button>
+              <button class="tog" data-tool="erase">Borrar</button>
+              <button class="tog" data-tool="restore">Restaurar</button>
+            </div>
+            <div class="control" id="surrealBrushCtl" style="display:none">
+              <div class="control-row"><label>Brush size</label><span class="val" id="surrealBrushVal">40</span></div>
+              <input type="range" id="surrealBrush" min="5" max="240" value="40">
+            </div>
+            <div class="tip" id="surrealCutTip" style="display:none"></div>
+            <button class="icon-btn wide" id="surrealResetCut" style="margin-top:6px">RESET CUTOUT</button>
+            </details>
+  
+            <div class="item-row" style="margin-top:10px">
+              <button class="icon-btn flex" id="surrealFwdBtn">↑ FWD</button>
+              <button class="icon-btn flex" id="surrealBwdBtn">↓ BACK</button>
+              <button class="icon-btn flex" id="surrealFlipBtn">⇄ FLIP</button>
+              <button class="icon-btn flex" id="surrealDupBtn">⧉ DUP</button>
+              <button class="icon-btn flex" id="surrealRemoveBtn">✕ DEL</button>
+            </div>
+  
+            <div class="rule"></div>
+          </div>
+  
+
+          <!-- El rótulo se esconde con el bloque: debajo solo queda RE-COMPOSE,
+               que ya se enciende solo cuando hace falta. Un titulo sobre un
+               hueco vacio es de lo que se queja: botones que no llevan a nada. -->
+          <div class="section-title" id="surrealTerminarTitulo" hidden>Terminar</div>
+          <button class="btn surreal-cta wide" id="surrealRecomposeBtn" style="display:none; margin-bottom:10px">
+            <span class="surreal-cta-title" style="font-size:14px">RE-COMPOSE</span>
+            <span class="surreal-cta-sub">reopen · adjust positions · re-finish</span>
+          </button>
+          <!-- REALISTIC y HIGH CONTRAST elegían el estilo desde dentro del
+               collage, cuando eso ya se decide en la pestaña STYLE. Escondidos,
+               no borrados: surreal.js les pone un listener nada más arrancar y
+               quitarlos del documento lo dejaría a medias. -->
+          <div class="surreal-finish" hidden style="display:none">
+            <button class="btn" id="surrealFinishRealistic">
+              <span class="finish-label">REALISTIC</span>
+              <span class="finish-sub">photoreal · grain · paper</span>
+            </button>
+            <button class="btn ghost" id="surrealFinishContrast">
+              <span class="finish-label">HIGH CONTRAST</span>
+              <span class="finish-sub">pure black · auto mode</span>
+            </button>
+          </div>
+          <!-- PASAR AL LIENZO retirado: el collage YA está en el lienzo, no hay
+               a dónde pasarlo. El nodo se queda para surreal.js. -->
+          <button class="btn wide" id="surrealSendRaw" hidden>→ PASAR AL LIENZO</button>
+        </aside>
+    </div><!-- /compose -->
+
+    <!-- ============ PREP PHOTO (3-point precision levels) ============ -->
+    <div id="prepSection" style="display:none">
+      <div class="rule"></div>
+      <div class="section-title">Prep photo <span class="hint">/ 3 puntos exactos</span></div>
+      <div class="tip">Toca en la foto el punto <b>más oscuro</b>, un <b>gris medio</b> y el <b>blanco</b>. Con esos tres valores reales se reequilibra todo el rango de contraste.</div>
+      <div class="pick-row" id="prepPickRow">
+        <button class="pick-btn" data-pick="black"><span class="pk-sw"></span><span class="pk-lbl">NEGRO</span><span class="pk-val">—</span></button>
+        <button class="pick-btn" data-pick="mid"><span class="pk-sw"></span><span class="pk-lbl">MEDIO</span><span class="pk-val">—</span></button>
+        <button class="pick-btn" data-pick="white"><span class="pk-sw"></span><span class="pk-lbl">BLANCO</span><span class="pk-val">—</span></button>
+      </div>
+      <div class="control">
+        <div class="control-row"><label>Clarity <span class="hint">/ contraste local</span></label><span class="val" id="prepClarityVal">25</span></div>
+        <input type="range" min="0" max="100" step="1" value="25" id="prepClarity">
+      </div>
+      <div class="history-row">
+        <button class="btn prep-cta flex" id="prepBtn">APLICAR</button>
+        <button class="icon-btn flex" id="prepAutoBtn" title="Rellena los 3 puntos por histograma">AUTO 3PT</button>
+      </div>
+      <button class="icon-btn wide" id="prepResetBtn" style="margin-top:6px" hidden>← VOLVER AL ORIGINAL</button>
+    </div>
+
+    <div class="rule"></div>
+
+    <!-- ============ STYLE ============ -->
+    <div class="styles" id="styles">
+      <button class="style-btn" data-style="surrealist" aria-selected="true">
+        <span class="n">01</span>SURREALIST
+      </button>
+      <button class="style-btn" data-style="threshold">
+        <span class="n">02</span>HIGH CONTRAST
+      </button>
+      <button class="style-btn" data-style="calco">
+        <span class="n">03</span>CALCO
+      </button>
+    </div>
+
+    <!-- Sin papel: el diseno queda en tinta sobre transparente (lo que en un
+         montaje se comporta como MULTIPLY, sin el rectangulo blanco detras).
+         Afecta a la vista previa Y a lo que exporta, para que sea lo mismo. -->
+    <label class="bg-toggle" style="margin-top:10px">
+      <input type="checkbox" id="sinPapelChk">
+      <span class="box"></span>
+      <span class="lbl">SIN PAPEL · MULTIPLY</span>
+    </label>
+
+    <div class="history-row" id="styleHistoryRow" hidden style="margin-top:8px">
+      <button class="icon-btn flex" id="styleUndoBtn" disabled title="Ctrl+Z">↶ UNDO</button>
+      <button class="icon-btn flex" id="styleRedoBtn" disabled title="Ctrl+Alt+Z">↷ REDO</button>
+    </div>
+
+    <div class="rule"></div>
+
+    <!-- ============ SURREALIST CONTROLS ============ -->
+    <div id="ctl-surrealist" class="ctl-group">
+      <button class="btn auto-tune wide" data-auto="surrealist">
+        <span class="bolt">⚡</span> AUTO-TUNE
+        <span class="auto-sub">analyze · set levels · done</span>
+      </button>
+      <div class="section-title">Tone <span class="hint">/ fine-tune</span></div>
+      <div class="control">
+        <div class="control-row"><label>Black point</label><span class="val" data-val="surrealist.bp">36</span></div>
+        <input type="range" min="0" max="120" value="36" data-section="surrealist" data-tweak="bp">
+      </div>
+      <div class="control">
+        <div class="control-row"><label>White point</label><span class="val" data-val="surrealist.wp">245</span></div>
+        <input type="range" min="160" max="255" value="245" data-section="surrealist" data-tweak="wp">
+      </div>
+      <div class="control">
+        <div class="control-row"><label>Gamma</label><span class="val" data-val="surrealist.gamma">0.95</span></div>
+        <input type="range" min="0.4" max="1.6" step="0.01" value="0.95" data-section="surrealist" data-tweak="gamma">
+      </div>
+      <div class="control">
+        <div class="control-row"><label>Contrast</label><span class="val" data-val="surrealist.contrast">1.30</span></div>
+        <input type="range" min="0.5" max="2.5" step="0.05" value="1.30" data-section="surrealist" data-tweak="contrast">
+      </div>
+      <div class="control">
+        <div class="control-row"><label>Grain</label><span class="val" data-val="surrealist.grain">22</span></div>
+        <input type="range" min="0" max="60" value="22" data-section="surrealist" data-tweak="grain">
+      </div>
+    </div>
+
+    <!-- ============ HIGH CONTRAST CONTROLS (overhauled) ============ -->
+    <div id="ctl-threshold" class="ctl-group" style="display:none">
+      <button class="btn auto-tune wide" data-auto="threshold">
+        <span class="bolt">⚡</span> AUTO-TUNE + PICK MODE
+        <span class="auto-sub">histogram · otsu · picks hard/dotwork/adaptive/edges</span>
+      </button>
+      <div class="section-title">Pre-level <span class="hint">/ auto-filled</span></div>
+      <div class="control">
+        <div class="control-row"><label>Black point</label><span class="val" data-val="threshold.bp">0</span></div>
+        <input type="range" min="0" max="200" value="0" data-section="threshold" data-tweak="bp">
+      </div>
+      <div class="control">
+        <div class="control-row"><label>White point</label><span class="val" data-val="threshold.wp">255</span></div>
+        <input type="range" min="55" max="255" value="255" data-section="threshold" data-tweak="wp">
+      </div>
+      <div class="control">
+        <div class="control-row"><label>Gamma</label><span class="val" data-val="threshold.gamma">1.00</span></div>
+        <input type="range" min="0.3" max="2.5" step="0.01" value="1.00" data-section="threshold" data-tweak="gamma">
+      </div>
+      <div class="control">
+        <div class="control-row"><label>Local boost</label><span class="val" data-val="threshold.localBoost">0.50</span></div>
+        <input type="range" min="0" max="3" step="0.05" value="0.50" data-section="threshold" data-tweak="localBoost">
+      </div>
+      <div class="control">
+        <div class="control-row"><label>Pre-smooth</label><span class="val" data-val="threshold.smooth">1</span></div>
+        <input type="range" min="0" max="6" step="1" value="1" data-section="threshold" data-tweak="smooth">
+      </div>
+
+      <div class="section-title" style="margin-top:14px">Mode</div>
+      <div class="toggle-row" id="threshModeRow">
+        <button class="tog" data-section="threshold" data-tweak="mode" data-val="hard" aria-selected="true">Hard</button>
+        <button class="tog" data-section="threshold" data-tweak="mode" data-val="dotwork">Dotwork</button>
+        <button class="tog" data-section="threshold" data-tweak="mode" data-val="adaptive">Adaptive</button>
+      </div>
+
+      <div class="control" data-thresh-show="hard,dotwork">
+        <div class="control-row"><label>Cut-off</label><span class="val" data-val="threshold.threshold">128</span></div>
+        <input type="range" min="20" max="240" value="128" data-section="threshold" data-tweak="threshold">
+      </div>
+
+      <div class="control" data-thresh-show="dotwork">
+        <div class="control-row"><label>Stipple opacity</label><span class="val" data-val="threshold.stippleOpacity">55</span></div>
+        <input type="range" min="5" max="100" step="1" value="55" data-section="threshold" data-tweak="stippleOpacity">
+      </div>
+      <div class="control" data-thresh-show="adaptive,dotwork" style="display:none">
+        <div class="control-row"><label>Window size</label><span class="val" data-val="threshold.windowSize">25</span></div>
+        <input type="range" min="3" max="80" step="1" value="25" data-section="threshold" data-tweak="windowSize">
+        <div class="tip">Radio de la zona que cada píxel compara consigo mismo. <b>Pequeño</b> = el umbral sigue cada sombra (saca detalle fino, ensucia). <b>Grande</b> = casi un umbral global, como el modo Hard. Si siempre lo tienes al máximo, usa <b>Hard</b>: es lo mismo pero más rápido.</div>
+      </div>
+      <div class="control" data-thresh-show="adaptive,dotwork" style="display:none">
+        <div class="control-row"><label>Bias</label><span class="val" data-val="threshold.bias">8</span></div>
+        <input type="range" min="0" max="60" step="1" value="8" data-section="threshold" data-tweak="bias">
+        <div class="tip">Cuánto más oscuro que su entorno tiene que ser un píxel para pasar a tinta. <b>0</b> = entinta todo lo que esté por debajo de la media (más negro y más ruido). <b>Alto</b> = solo lo claramente oscuro (más limpio, pierde grises).</div>
+      </div>
+
+      <div class="section-title" style="margin-top:14px">Outline <span class="hint">/ silhouette + holes</span></div>
+      <div class="control">
+        <div class="control-row"><label>Outline thickness</label><span class="val" data-val="threshold.outlineWidth">0</span></div>
+        <input type="range" min="0" max="5" step="0.5" value="0" data-section="threshold" data-tweak="outlineWidth">
+      </div>
+
+      <div class="section-title" style="margin-top:14px">Clean-up <span class="hint">/ removes dirt</span></div>
+      <div class="control" data-thresh-show="hard,adaptive,edges,dotwork">
+        <div class="control-row"><label>Despeckle</label><span class="val" data-val="threshold.despeckle">35</span></div>
+        <input type="range" min="0" max="100" step="1" value="35" data-section="threshold" data-tweak="despeckle">
+      </div>
+    </div>
+
+    <!-- ============ CALCO CONTROLS ============ -->
+    <div id="ctl-calco" class="ctl-group" style="display:none">
+      <button class="btn auto-tune wide" data-auto="calco">
+        <span class="bolt">⚡</span> AUTO-TUNE
+        <span class="auto-sub">analyze · optimize for stencil</span>
+      </button>
+      <div class="section-title">Levels <span class="hint">/ pre-process</span></div>
+      <div class="control">
+        <div class="control-row"><label>Black point</label><span class="val" data-val="calco.bp">0</span></div>
+        <input type="range" min="0" max="200" value="0" data-section="calco" data-tweak="bp">
+      </div>
+      <div class="control">
+        <div class="control-row"><label>White point</label><span class="val" data-val="calco.wp">255</span></div>
+        <input type="range" min="55" max="255" value="255" data-section="calco" data-tweak="wp">
+      </div>
+      <div class="control">
+        <div class="control-row"><label>Gamma</label><span class="val" data-val="calco.gamma">1.00</span></div>
+        <input type="range" min="0.3" max="2.5" step="0.01" value="1.00" data-section="calco" data-tweak="gamma">
+      </div>
+
+      <div class="section-title" style="margin-top:14px">Edge detection</div>
+      <div class="control">
+        <div class="control-row"><label>Sensitivity</label><span class="val" data-val="calco.sensitivity">35</span></div>
+        <input type="range" min="0" max="100" step="1" value="35" data-section="calco" data-tweak="sensitivity">
+      </div>
+      <div class="control">
+        <div class="control-row"><label>Detail boost</label><span class="val" data-val="calco.detail">40</span></div>
+        <input type="range" min="0" max="100" step="1" value="40" data-section="calco" data-tweak="detail">
+      </div>
+      <div class="control">
+        <div class="control-row"><label>Blur (denoise)</label><span class="val" data-val="calco.blur">3</span></div>
+        <input type="range" min="0" max="8" step="1" value="3" data-section="calco" data-tweak="blur">
+      </div>
+
+      <div class="section-title" style="margin-top:14px">Output</div>
+      <div class="control">
+        <div class="control-row"><label>Gap closing</label><span class="val" data-val="calco.gapClose">2</span></div>
+        <input type="range" min="0" max="5" step="1" value="2" data-section="calco" data-tweak="gapClose">
+      </div>
+      <div class="control">
+        <div class="control-row"><label>Line thickness</label><span class="val" data-val="calco.thickness">1</span></div>
+        <input type="range" min="0" max="5" step="1" value="1" data-section="calco" data-tweak="thickness">
+      </div>
+      <div class="control">
+        <div class="control-row"><label>Clean</label><span class="val" data-val="calco.clean">65</span></div>
+        <input type="range" min="0" max="100" step="1" value="65" data-section="calco" data-tweak="clean">
+      </div>
+    </div>
+
+    <!-- ============ HALFTONE / STIPPLE removed in v3 ============ -->
+
+    <div class="rule"></div>
+
+    <!-- ============ MASK ============ -->
+    <!-- ============ NEGATIVE / INVERT ============ -->
+    </div><!-- /style -->
+
+
+    <div class="side-panel" data-panel="finish" hidden>
+    <div class="section-title">Post-processing</div>
+    <label class="bg-toggle" style="margin-bottom:14px">
+      <input type="checkbox" id="invertChk">
+      <span class="box"></span>
+      <span class="lbl">NEGATIVE / INVERT</span>
+    </label>
+
+    <div class="section-title">Shape mask <span class="hint">/ recorte fijo</span></div>
+    <div class="shape-grid" id="shapes">
+      <button class="shape-btn" data-shape="none" aria-selected="true" title="Sin máscara"><svg viewBox="0 0 24 24"><path d="M4 20 20 4"/><rect x="3.5" y="3.5" width="17" height="17" stroke-dasharray="3 3"/></svg></button>
+      <button class="shape-btn" data-shape="oval" title="Círculo"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/></svg></button>
+      <button class="shape-btn" data-shape="rect" title="Cuadrado"><svg viewBox="0 0 24 24"><rect x="3.5" y="3.5" width="17" height="17"/></svg></button>
+      <button class="shape-btn" data-shape="heart" title="Corazón"><svg viewBox="0 0 24 24"><path d="M12 21S3 14.5 3 8.8C3 5.9 5.2 4 7.6 4 9.6 4 11.2 5.2 12 6.8 12.8 5.2 14.4 4 16.4 4 18.8 4 21 5.9 21 8.8 21 14.5 12 21 12 21Z"/></svg></button>
+      <button class="shape-btn" data-shape="star" title="Estrella"><svg viewBox="0 0 24 24"><path d="M12 2.5 14.9 9.2 22 9.9 16.7 14.7 18.2 21.7 12 18.1 5.8 21.7 7.3 14.7 2 9.9 9.1 9.2Z"/></svg></button>
+      <!-- La «estrella alargada» se retiro: salia deformada. El dibujo sigue en
+           `shapePath` para que no se rompa un diseno viejo que la use. -->
+      <button class="shape-btn" data-shape="destello" title="Destello"><svg viewBox="0 0 24 24"><path d="M12 1 13.1 10.4 17.5 6.5 14.4 11.2 23 12 14.4 12.8 17.5 17.5 13.1 13.6 12 23 10.9 13.6 6.5 17.5 9.6 12.8 1 12 9.6 11.2 6.5 6.5 10.9 10.4Z"/></svg></button>
+      <button class="shape-btn" data-shape="diamond" title="Rombo"><svg viewBox="0 0 24 24"><path d="M12 2 22 12 12 22 2 12Z"/></svg></button>
+      <button class="shape-btn" data-shape="hex" title="Hexágono"><svg viewBox="0 0 24 24"><path d="M12 2.5 20.5 7.2v9.6L12 21.5 3.5 16.8V7.2Z"/></svg></button>
+      <button class="shape-btn" data-shape="arch" title="Arco / lápida"><svg viewBox="0 0 24 24"><path d="M4.5 21V10a7.5 7.5 0 0 1 15 0v11Z"/></svg></button>
+    </div>
+    <div id="shapeCtl" style="display:none">
+      <div class="tip">La forma queda <b>centrada y fija</b>: mueve y escala el <b>diseño</b> con el gizmo del lienzo para encuadrarlo dentro.</div>
+      <div class="control">
+        <div class="control-row"><label>Tamaño</label><span class="val" id="shapeScaleVal">1.00</span></div>
+        <input type="range" id="shapeScale" min="0.2" max="2.5" step="0.01" value="1">
+      </div>
+      <div class="control">
+        <div class="control-row"><label>Rotación</label><span class="val" id="shapeRotVal">0°</span></div>
+        <input type="range" id="shapeRot" min="-180" max="180" step="1" value="0">
+      </div>
+      <div class="control">
+        <div class="control-row"><label>Contorno de la forma</label><span class="val" id="shapeOutlineVal">0</span></div>
+        <input type="range" id="shapeOutline" min="0" max="5" step="0.5" value="0">
+      </div>
+      <!-- Lo que la forma recorta pero el diseno no llega a tapar: o se deja
+           vacio (asoma el papel) o se rellena de color plano. -->
+      <div class="section-title" style="margin-top:10px">Relleno de la forma</div>
+      <div class="toggle-row three" id="shapeFill">
+        <button class="tog" data-fill="" aria-selected="true" title="El hueco se queda vacio">Vacío</button>
+        <button class="tog" data-fill="negro" title="Rellena el hueco de negro plano">Negro</button>
+        <button class="tog" data-fill="blanco" title="Rellena el hueco de blanco plano">Blanco</button>
+      </div>
+      <div class="section-title" style="margin-top:14px">Diseño <span class="hint">/ mueve · escala · rota</span></div>
+      <div class="tip">Arrastra el diseño sobre el lienzo · las <b>esquinas</b> lo escalan · el mando de arriba lo <b>rota</b>. La forma de recorte se queda quieta.</div>
+      <div class="control">
+        <div class="control-row"><label>Tamaño</label><span class="val" id="designScaleVal">1.00</span></div>
+        <input type="range" id="designScale" min="0.2" max="3" step="0.01" value="1">
+      </div>
+      <div class="control">
+        <div class="control-row"><label>Rotación</label><span class="val" id="designRotVal">0°</span></div>
+        <input type="range" id="designRot" min="-180" max="180" step="1" value="0">
+      </div>
+      <button class="icon-btn wide" id="designResetBtn" style="margin-bottom:6px">CENTRAR DISEÑO</button>
+    </div>
+
+    <label class="bg-toggle big" style="margin-top:14px">
+      <input type="checkbox" id="distressChk">
+      <span class="box"></span>
+      <span class="lbl">WORN / DISTRESSED</span>
+    </label>
+    <div class="control" id="distressCtl" style="display:none">
+      <div class="control-row"><label>Wear amount</label><span class="val" id="distressVal">40</span></div>
+      <input type="range" id="distressAmt" min="5" max="90" value="40">
+      <div class="control-row" style="margin-top:8px"><label>Texture</label></div>
+      <div class="toggle-row four" id="distressNoiseType">
+        <button class="tog icon-tog" data-noise="fine" aria-selected="true" title="Fine — grano fino"><svg viewBox="0 0 24 24"><circle cx="6" cy="6" r="1"/><circle cx="12" cy="5" r="1"/><circle cx="18" cy="7" r="1"/><circle cx="5" cy="12" r="1"/><circle cx="11" cy="12" r="1"/><circle cx="17" cy="13" r="1"/><circle cx="7" cy="18" r="1"/><circle cx="13" cy="18" r="1"/><circle cx="19" cy="18" r="1"/></svg></button>
+        <button class="tog icon-tog" data-noise="coarse" title="Coarse — grano grueso"><svg viewBox="0 0 24 24"><circle cx="7" cy="7" r="2.6"/><circle cx="17" cy="8" r="2.2"/><circle cx="8" cy="17" r="2.2"/><circle cx="17" cy="17" r="2.8"/></svg></button>
+        <button class="tog icon-tog" data-noise="scratches" title="Scratches — arañazos"><svg viewBox="0 0 24 24" fill="none"><path d="M4 19 13 5"/><path d="M10 20 18 8"/><path d="M15 19 21 12"/><path d="M3 11 7 5"/></svg></button>
+        <button class="tog icon-tog" data-noise="speckle" title="Speckle — salpicado"><svg viewBox="0 0 24 24"><circle cx="6" cy="8" r="2"/><circle cx="13" cy="6" r="0.9"/><circle cx="18" cy="11" r="1.8"/><circle cx="9" cy="14" r="1.1"/><circle cx="15" cy="17" r="2.3"/><circle cx="5" cy="18" r="0.9"/></svg></button>
+      </div>
+      <div class="control-row" style="margin-top:10px"><label>Tamaño de la textura</label><span class="val" id="distressTexVal">1.00</span></div>
+      <input type="range" id="distressTex" min="0.3" max="3" step="0.05" value="1">
+      <div class="control-row"><label>Foco en bordes</label><span class="val" id="distressEdgeVal">100</span></div>
+      <input type="range" id="distressEdge" min="0" max="100" value="100">
+      <div class="control-row"><label>Arañazos</label><span class="val" id="distressScratchVal">100</span></div>
+      <input type="range" id="distressScratch" min="0" max="200" value="100">
+      <button class="icon-btn wide" id="distressShuffle" style="margin-top:8px">↻ VARIAR PATRÓN</button>
+      <div class="control-row" style="margin-top:10px"><label>Aplicar a <span class="hint" id="distressTargetHint"></span></label></div>
+      <div class="toggle-row two" id="distressTarget">
+        <button class="tog" data-target="design" aria-selected="true">Solo diseño</button>
+        <button class="tog" data-target="text">Solo texto</button>
+        <button class="tog" data-target="all">Todo</button>
+      </div>
+      <div class="toggle-row two" id="distressElements" style="display:none"></div>
+    </div>
+
+    <label class="bg-toggle big" style="margin-top:14px">
+      <input type="checkbox" id="textOverlayChk">
+      <span class="box"></span>
+      <span class="lbl">CURSIVE TEXT</span>
+    </label>
+    <div class="control" id="textOverlayCtl" style="display:none">
+      <input class="text-input" type="text" id="textOverlayInput" placeholder="Your text…" maxlength="40" style="margin-bottom:8px">
+      <div class="control-row"><label>Size</label><span class="val" id="textOverlaySizeVal">8</span></div>
+      <input type="range" id="textOverlaySize" min="3" max="60" value="8">
+      <div class="control-row"><label>Rotation</label><span class="val" id="textOverlayRotVal">0°</span></div>
+      <input type="range" id="textOverlayRot" min="-180" max="180" value="0">
+      <label class="bg-toggle" style="margin:10px 0 4px">
+        <input type="checkbox" id="textXorChk">
+        <span class="box"></span>
+        <span class="lbl">CRUCE EN NEGATIVO</span>
+      </label>
+      <div class="hint" style="margin:8px 0 6px; font-size:10px; line-height:1.5; color:var(--mute)">Drag the text on the design · use the handles to rotate and resize it.</div>
+      <div class="font-picker" id="textOverlayFontPicker"></div>
+    </div>
+
+    </div><!-- /finish -->
+
+    <div class="side-panel" data-panel="mask" hidden>
+    <div class="section-title">
+      Background mask
+      <span class="hint" id="maskCoverage">—</span>
+    </div>
+    <button class="btn ghost wide" id="maskEditBtn">EDIT MASK</button>
+
+    <div class="control">
+      <div class="control-row"><label>Tolerance</label><span class="val" data-val="mask.tolerance">30</span></div>
+      <input type="range" min="3" max="120" value="30" data-section="mask" data-tweak="tolerance">
+    </div>
+    <div class="control">
+      <div class="control-row"><label>Edge softness</label><span class="val" data-val="mask.feather">0</span></div>
+      <input type="range" min="0" max="30" value="0" data-section="mask" data-tweak="feather">
+    </div>
+    <button class="icon-btn wide" id="autoMaskBtn">AUTO FROM CORNERS</button>
+
+    <div id="maskTools" style="display:none; margin-top:10px">
+      <div class="section-title" style="margin-top:8px">Herramienta</div>
+      <!-- 3x2 grid, read by COLUMN: click / lazo / pincel.
+           Row 1 removes, row 2 brings back. Every tool has its inverse
+           directly underneath it. -->
+      <div class="tool-grid-labels"><span>Quitar</span></div>
+      <div class="toggle-row three">
+        <button class="tog" data-section="mask" data-tweak="tool" data-val="flood" aria-selected="true">Click</button>
+        <button class="tog" data-section="mask" data-tweak="tool" data-val="lassoCut">Lazo</button>
+        <button class="tog" data-section="mask" data-tweak="tool" data-val="erase">Pincel</button>
+      </div>
+      <div class="tool-grid-labels"><span>Devolver</span></div>
+      <div class="toggle-row three">
+        <button class="tog" data-section="mask" data-tweak="tool" data-val="floodRestore">Click</button>
+        <button class="tog" data-section="mask" data-tweak="tool" data-val="lasso">Lazo</button>
+        <button class="tog" data-section="mask" data-tweak="tool" data-val="restore">Pincel</button>
+      </div>
+      <div class="control" data-tool-show="flood">
+        <div class="tip">Toca una zona: <b>desaparece</b> todo lo del color parecido.</div>
+      </div>
+      <div class="control" data-tool-show="floodRestore" style="display:none">
+        <div class="tip">El inverso. Toca una zona borrada: <b>vuelve</b> todo lo del color parecido.</div>
+      </div>
+      <div class="control" data-tool-show="erase,restore">
+        <div class="control-row"><label>Brush size</label><span class="val" data-val="mask.brushSize">40</span></div>
+        <input type="range" min="5" max="240" value="40" data-section="mask" data-tweak="brushSize">
+      </div>
+      <div class="control" data-tool-show="lassoCut" style="display:none">
+        <div class="tip">Rodea con el dedo <b>lo que quieres tapar</b>: todo lo de dentro del lazo desaparece.</div>
+      </div>
+      <div class="control" data-tool-show="lasso" style="display:none">
+        <div class="tip">Rodea <b>lo que quieres conservar</b>: todo lo de fuera del lazo desaparece.</div>
+      </div>
+      <!-- Deshacer y rehacer se hacen con Ctrl+Z y Ctrl+Alt+Z. Los nodos se
+           quedan escondidos porque app.js les pone escuchadores al arrancar. -->
+      <div class="history-row" hidden>
+        <button class="icon-btn flex" id="undoBtn" disabled title="Ctrl+Z">↶ UNDO</button>
+        <button class="icon-btn flex" id="redoBtn" disabled title="Ctrl+Alt+Z">↷ REDO</button>
+      </div>
+      <button class="icon-btn wide" id="resetMaskBtn">RESET MASK</button>
+    </div>
+
+    <div class="rule"></div>
+
+    </div><!-- /mask -->
+
+    <div class="side-panel" data-panel="paper" hidden>
+    <!-- ============ PAPER ============ -->
+    <!-- Tamaño y fondo viven aquí, no en STYLE: deciden el SOPORTE (qué forma
+         tiene la hoja y si lleva papel debajo), no cómo se dibuja la tinta. -->
+    <div class="section-title">Formato</div>
+    <div class="toggle-row" id="surrealSize">
+      <button class="tog" data-w="1080" data-h="1350" aria-selected="true">4:5</button>
+      <button class="tog" data-w="1080" data-h="1080">1:1</button>
+      <button class="tog" data-w="1080" data-h="1920">9:16</button>
+    </div>
+
+    <div class="section-title" style="margin-top:10px">Fondo</div>
+    <div class="toggle-row two" id="surrealBg">
+      <button class="tog" data-bg="transparent" aria-selected="true">Transparent</button>
+      <button class="tog" data-bg="paper">Paper</button>
+    </div>
+
+    <!-- Todo lo de debajo sólo tiene sentido si hay papel. Con el fondo
+         transparente no hay color, ni grano, ni sombra que ajustar: se esconde
+         en vez de dejarlo ahí sin hacer nada. -->
+    <div id="paperSoloPapel" hidden>
+    <div class="rule"></div>
+    <div class="section-title">Paper</div>
+    <div class="toggle-row papers-row" id="papers">
+      <button class="tog" data-paper="#d4cbc0" aria-selected="true" style="background:#d4cbc0;color:#0a0908">Cream</button>
+      <button class="tog" data-paper="#c9c3b4" style="background:#c9c3b4;color:#0a0908">Stone</button>
+      <button class="tog" data-paper="#e5dccd" style="background:#e5dccd;color:#0a0908">Bone</button>
+    </div>
+    <div class="paper-custom">
+      <input type="color" id="paperPicker" value="#d9d4c8" title="Pick a paper colour">
+      <button class="icon-btn" id="paperPickerSave" title="Save this colour to your palette">+ SAVE</button>
+    </div>
+
+    <div class="control">
+      <div class="control-row"><label>Paper grain</label><span class="val" data-val="compose.paperGrain">14</span></div>
+      <input type="range" min="0" max="40" value="14" data-section="compose" data-tweak="paperGrain">
+    </div>
+    <div class="control">
+      <div class="control-row"><label>Top grain</label><span class="val" data-val="compose.topGrain">7</span></div>
+      <input type="range" min="0" max="30" value="7" data-section="compose" data-tweak="topGrain">
+    </div>
+    <div class="control">
+      <div class="control-row"><label>Drop shadow</label><span class="val" data-val="compose.shadow">0.35</span></div>
+      <input type="range" min="0" max="1" step="0.01" value="0.35" data-section="compose" data-tweak="shadow">
+    </div>
+    </div><!-- /paperSoloPapel -->
+
+    <div class="tip" id="paperAvisoTransparente">Con el fondo <b>transparente</b> no hay papel que
+      ajustar. Elige <b>Paper</b> arriba y salen el color, el grano y la sombra.</div>
+
+    </div><!-- /paper -->
+
+    <div class="foot">
+      <img src="uploads/kaos_logo.PNG" class="foot-logo" alt="">
+      <span class="foot-handle">@KAOS.REALM</span><br/>
+      EST. MMXXVI · NO GODS · NO MASTERS
+    </div>
+
+    <!-- El bloque de IA de imagen se esconde: no funciona y solo ocupa sitio.
+         El nodo se queda porque ai.js le engancha escuchadores al arrancar. -->
+    <div class="fal-chip" id="falChip" data-state="on" hidden>
+      <div class="fal-chip-line">
+        <span class="fal-dot"></span>
+        <span class="fal-label" id="falLabel">AI · imagen</span>
+        <span class="fal-state" id="falState">ready</span>
+      </div>
+      <button class="icon-btn fal-cfg-btn" id="falConfigBtn">CONFIGURE</button>
+    </div>
+    </div><!-- /side-scroll -->
+
+    <div class="side-actions">
+    <div class="actions">
+      <!-- UPLOAD removed: clicking the empty canvas, dragging a file in, and
+           pasting all already open the same file picker. -->
+      <button class="btn" id="downloadBtn" disabled>EXPORT</button>
+    </div>
+    <div class="actions" style="margin-top:8px">
+      <button class="icon-btn" id="saveProjectBtn" disabled>◉ GUARDAR</button>
+      <button class="icon-btn" id="openProjectBtn">▤ MIS DISEÑOS</button>
+    </div>
+    <button class="icon-btn wide" id="duplicateResultBtn" disabled style="margin-top:8px">⧉ DUPLICATE TO GALLERY</button>
+    <label class="bg-toggle">
+      <input type="checkbox" id="transparentBgChk">
+      <span class="box"></span>
+      <span class="lbl">TRANSPARENT BACKGROUND</span>
+    </label>
+
+    <input type="file" id="fileInput" accept="image/*" multiple />
+
+    </div><!-- /side-actions -->
+  </aside>
+
+  <!-- =================== STAGE =================== -->
+  <main class="stage">
+    <div class="toolbar">
+      <div class="meta">
+        <span class="pill">LIVE</span>
+        <span id="dimsLabel" style="margin-left:12px"></span>
+      </div>
+      <div class="right">
+        <button class="icon-btn" id="sheetsTopBtn" title="Tus hojas de flash guardadas">HOJAS</button>
+        <button class="icon-btn" id="galleryBtn">GALLERY <span class="gallery-count" id="galleryCount">0</span></button>
+        <button class="icon-btn" id="resetBtn">RESET</button>
+        <!-- Only shown when the app is served by server.js; hidden on file:// -->
+        <button class="icon-btn sync-btn" id="syncBtn" hidden title="Sincronizar con el iPad">
+          <span class="sync-dot"></span><span id="syncLabel">SYNC</span>
+        </button>
+      </div>
+    </div>
+
+    <div class="canvas-wrap" id="canvasWrap">
+      <div class="paper" id="paper" style="display:none">
+        <canvas id="outCanvas"></canvas>
+      </div>
+      <div class="design-gizmo" id="designGizmo" style="display:none">
+        <div class="dg-stick"></div>
+        <div class="dg-h dg-rot" data-dg="rot" title="Rotar el diseño"></div>
+        <div class="dg-h dg-nw" data-dg="scale" title="Escalar el diseño"></div>
+        <div class="dg-h dg-ne" data-dg="scale" title="Escalar el diseño"></div>
+        <div class="dg-h dg-sw" data-dg="scale" title="Escalar el diseño"></div>
+        <div class="dg-h dg-se" data-dg="scale" title="Escalar el diseño"></div>
+      </div>
+      <div class="text-gizmo" id="textGizmo" style="display:none">
+        <div class="tg-stick"></div>
+        <div class="tg-h tg-rot" id="tgRot" title="Rotate"></div>
+        <div class="tg-h tg-scale" id="tgScale" title="Resize"></div>
+      </div>
+      <div class="empty" id="empty">
+        <div class="big">drop a soul.</div>
+        <div>DRAG IMAGE · PASTE · OR CLICK HERE</div>
+        <div class="sub">
+          Una foto y va directa al estilo.<br/>
+          <b>Dos o más y se montan en collage</b>, con sus capas en COMPOSE.
+        </div>
+      </div>
+    </div>
+
+    <div class="dropzone" id="dropzone">
+      <div class="label">DROP TO BLEED</div>
+    </div>
+
+    <div id="brushCursor" class="brush-cursor"></div>
+
+    <div class="mask-banner">
+      MASK EDIT · CLICK / DRAG ON IMAGE · TOGGLE OFF TO PREVIEW
+    </div>
+    <!-- El collage se pinta encima del lienzo principal, no en una ventana
+         flotante. Conserva el id `surrealModal` a propósito: surreal.js lo
+         enseña y lo esconde por ese id, y así entrar y salir del collage sigue
+         siendo cosa suya y no hay dos sitios decidiendo lo mismo. -->
+    <div class="compose-stage" id="surrealModal" style="display:none">
+      <div class="surreal-view" id="surrealView">
+        <div class="surreal-canvas-wrap" id="surrealCanvasWrap">
+          <canvas id="surrealCanvas"></canvas>
+          <!-- Este es ahora el cartel de bienvenida: sustituye al «drop a soul»
+               del lienzo normal. Lo primero que ve al abrir es el collage. -->
+          <div class="surreal-empty" id="surrealEmpty">
+            <div class="gothic-md">drop a soul.</div>
+            <div>PULSA AQUÍ · ARRASTRA FOTOS · O PEGA CON CTRL+V</div>
+            <div class="sub">El fondo se recorta solo.<br/>Arrastra para mover · esquinas para el tamaño · el mando de arriba para girar</div>
+          </div>
+          <div class="surreal-hint" id="surrealHint"></div>
+          <button class="icon-btn surreal-live-toggle" id="surrealLivePreviewToggle" aria-selected="false">STYLE PREVIEW</button>
+          <div class="surreal-live-preview" id="surrealLivePreview" style="display:none">
+            <div class="slp-label">STYLE PREVIEW</div>
+            <canvas id="surrealLivePreviewCanvas"></canvas>
+          </div>
+        </div>
+      </div>
+    </div>
+  </main>
+</div>
+
+<!-- =================== STYLE NOTES DRAWER =================== -->
+<!-- Hidden at the user's request. The markup is kept because the text inside is
+     the only written explanation of how auto-tune picks its values. Delete the
+     `hidden` attribute to bring the drawer back. -->
+<div class="analysis" id="analysis" hidden>
+  <button class="analysis-toggle" id="analysisToggle">STYLE NOTES ↑</button>
+  <div class="analysis-body">
+    <h4>00 — Surreal Compose</h4>
+    <p>Stitch multiple photos into a single impossible subject (cat-flower, head-tomato, etc.). Each element auto-cuts its background from the corners; drag to move, wheel to scale, shift+wheel to rotate. Pick <b>Realistic</b> or <b>High Contrast</b> finish — the merged result drops into the main canvas with levels auto-tuned.</p>
+
+    <h4>Auto-tune</h4>
+    <p><b>Surrealist auto</b> picks black/white points at the 0.5%/99.5% histogram percentiles, sets gamma so post-level mean ≈ 118, and scales contrast by the source's standard deviation.</p>
+    <p><b>High-contrast auto</b> additionally runs Otsu's threshold for the cut-off, measures lighting unevenness across a 12×12 tile grid, estimates high-frequency texture via neighbour differences, and computes Otsu separability for bimodality. Mode is picked: high separability + clean → <b>Hard</b>, uneven lighting → <b>Adaptive</b>, noisy mid-tones → <b>Dotwork</b>, line-art-like → <b>Edges</b>.</p>
+
+    <h4>01 — Surrealist Photocollage</h4>
+    <p>Desaturated photoreal subject, crushed shadows, preserved highlights, hard cut-out edges, heavy paper grain. Reads as a <em>physical</em> photo pasted to cream stock.</p>
+    <p>Recipe: grayscale → levels (BP, WP, gamma) → S-curve contrast → grain → multiply over cream paper. Background is removed via the Mask panel.</p>
+
+    <h4>02 — High Contrast</h4>
+    <p>Pure black on cream. Four modes:</p>
+    <p><b>Hard</b> — global cut-off threshold. Fastest, cleanest for graphic subjects.<br/>
+    <b>Dotwork</b> — Pure blacks below the cut-off stay solid and crisp; the <b>Stipple Opacity</b> control sets how dark the transition band of dots is: low values keep the fringe airy and grey, high values push it toward solid black.<br/>
+    <b>Adaptive</b> — local-mean threshold. Each pixel compares against its neighborhood, so uneven lighting doesn't swallow the subject.<br/>
+    <b>Edges</b> — pure Sobel edge map. Outline-only rendering.</p>
+    <p><b>Pre-level</b> normalizes the source (fixes dirty BP/WP, lifts midtones via gamma). <b>Local boost</b> is an unsharp pre-amp that exaggerates local contrast before threshold.</p>
+    <p><b>Outline lock / Edge overlay</b> — overlays Sobel edges on top of any mode, so the main shape is guaranteed visible regardless of threshold.</p>
+    <p><b>Clean-up / Despeckle</b> — removes tiny isolated ink specks (secondary reflections, sensor noise) and fills pinholes, then gently smooths the silhouettes. Essential for low-contrast metallic / reflective sources that otherwise read as "dirty". Auto-tune raises it when the figure isn't cleanly bimodal. Disabled in Dotwork (its dots are intentionally tiny).</p>
+
+    <h4>03 — Halftone</h4>
+    <p>Ben-day dot rasterization. Variable-radius black dots on a rotated grid. Recipe: sample mean luminance per cell → dot radius = (1 − L)^γ × boost × cell/2.</p>
+
+    <h4>04 — Stipple / Engraving</h4>
+    <p>Random-placed dot density imitating 19th-century engravings. Darker regions accumulate more dots. Reject samples where random() > local darkness.</p>
+
+    <h4>Substrate</h4>
+    <p>Cream / stone / bone paper, uniform grain, soft vignette, optional drop shadow under cutouts to sell the "pasted-on" effect.</p>
+
+    <h4>Mask</h4>
+    <p>Per-pixel keep/remove buffer. <b>Auto from corners</b> flood-fills from each corner within the tolerance radius. <b>Click</b> flood-fills wherever you tap. <b>Erase/Restore</b> brushes for cleanup.</p>
+  </div>
+</div>
+
+<!-- ============ SURREAL COMPOSER MODAL ============ -->
+
+<!-- ============ GALLERY MODAL ============ -->
+<div class="modal" id="galleryModal" style="display:none">
+  <div class="modal-inner">
+    <div class="modal-head">
+      <div class="modal-title">
+        <span class="gothic" id="galleryModalTitle">Flash Gallery</span>
+        <span class="modal-sub" id="gallerySubtitle">—</span>
+      </div>
+      <div class="modal-actions">
+        <input type="file" id="galleryImportInput" accept="image/*" multiple style="display:none">
+        <input type="file" id="backupImportInput" accept="application/json,.json" style="display:none">
+        <button class="icon-btn" id="addFromGalleryTopBtn" style="display:none">+ A ESTA HOJA</button>
+        <button class="icon-btn" id="galleryImportBtn">+ IMPORT</button>
+        <button class="icon-btn" id="sessionsBtn" hidden>HOJAS GUARDADAS</button>
+        <button class="icon-btn" id="backupExportBtn">↓ BACKUP</button>
+        <button class="icon-btn" id="backupImportBtn">↑ RESTAURAR</button>
+        <button class="icon-btn" id="galleryClearBtn">CLEAR ALL</button>
+        <button class="icon-btn" id="galleryCloseBtn">✕ CLOSE</button>
+      </div>
+    </div>
+
+    <div class="gallery-view" id="galleryView">
+      <div class="gallery-folders" id="galleryFolders"></div>
+      <div class="gallery-grid" id="galleryGrid"></div>
+      <div class="gallery-empty" id="galleryEmpty">
+        <div class="gothic-md">no flash yet</div>
+        <div>EXPORT PNG TO ADD DESIGNS TO THE GALLERY</div>
+      </div>
+      <div class="gallery-footer">
+        <div class="sel-status" id="selStatus">ELIGE 3 O MÁS Y PASA AL EDITOR DE POSTS</div>
+        <div class="gallery-footer-actions">
+          <button class="icon-btn" id="selectAllBtn">SELECT ALL</button>
+          <button class="icon-btn" id="moveSelectedBtn" disabled>MOVE TO FOLDER…</button>
+          <button class="btn" id="composeBtn" disabled>ABRIR EDITOR DE POSTS →</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="compose-view" id="composeView" style="display:none">
+      <div class="compose-canvas-wrap">
+        <div class="sheet-toolbar" id="sheetToolbar" style="display:none">
+          <button class="icon-btn" id="sheetPrevBtn">‹ PREV</button>
+          <span class="sheet-toolbar-label" id="sheetToolbarLabel">Sheet 1/1</span>
+          <button class="icon-btn" id="sheetNextBtn">NEXT ›</button>
+        </div>
+        <div class="sheet-pair-toolbar" id="sheetPairToolbar" style="display:none">
+          <button class="icon-btn" id="pairPrevBtn">‹ PREV</button>
+          <span class="sheet-toolbar-label" id="sheetPairLabel">Sheets 1-2/2</span>
+          <button class="icon-btn" id="pairNextBtn">NEXT ›</button>
+        </div>
+        <canvas id="composeCanvas"></canvas>
+        <div class="sheet-pair" id="sheetPair" style="display:none">
+          <div class="sheet-pair-cell"><canvas id="sheetCanvasL"></canvas></div>
+          <div class="sheet-pair-cell"><canvas id="sheetCanvasR"></canvas></div>
+        </div>
+        <div class="compose-gizmo" id="composeGizmo" style="display:none">
+          <div class="gizmo-stick" id="gizmoStick"></div>
+          <div class="gizmo-handle gizmo-corner" data-corner="nw"></div>
+          <div class="gizmo-handle gizmo-corner" data-corner="ne"></div>
+          <div class="gizmo-handle gizmo-corner" data-corner="sw"></div>
+          <div class="gizmo-handle gizmo-corner" data-corner="se"></div>
+          <div class="gizmo-handle gizmo-rotate" id="gizmoRotate" title="Drag to rotate">⟳</div>
+          <div class="gizmo-handle gizmo-delete" id="gizmoDelete" title="Remove this design from the sheet">✕</div>
+        </div>
+      </div>
+      <aside class="compose-side">
+        <div id="composeItemPanel" class="item-panel" style="display:none">
+          <div class="section-title">Selected sticker <span class="hint" id="itemPanelHint">—</span></div>
+          <div class="control">
+            <div class="control-row"><label>Scale</label><span class="val" id="itemScaleVal">1.00</span></div>
+            <div class="control-row"><label>Rotation</label><span class="val" id="itemRotVal">0°</span></div>
+            <div class="gizmo-hint">Drag the corner handles on the design to scale · drag the ⟳ handle to rotate</div>
+          </div>
+          <div class="item-row">
+            <button class="icon-btn flex" id="itemBwdBtn">↓ BACK</button>
+            <button class="icon-btn flex" id="itemFwdBtn">↑ FWD</button>
+            <button class="icon-btn flex" id="itemRemoveBtn">✕ REMOVE</button>
+          </div>
+          <div class="rule"></div>
+        </div>
+
+        <div class="section-title">Flash sheet</div>
+        <div class="control">
+          <div class="control-row"><label>Size</label><span class="val" id="composeSizeVal">1080×1350</span></div>
+          <div class="toggle-row" id="composeSize">
+            <button class="tog" data-w="1080" data-h="1350" aria-selected="true">4:5</button>
+            <button class="tog" data-w="1080" data-h="1080">1:1</button>
+            <button class="tog" data-w="1080" data-h="1920">9:16</button>
+          </div>
+        </div>
+
+        <div class="section-title">Layout</div>
+        <div class="toggle-row" id="composeLayout">
+          <button class="tog" data-layout="tight" aria-selected="true">Tight</button>
+          <button class="tog" data-layout="scatter">Scatter</button>
+          <button class="tog" data-layout="manual" id="manualLayoutBtn">Manual</button>
+        </div>
+        <div class="control">
+          <div class="control-row"><label>Bleed</label><span class="val" id="composeBleedVal">2%</span></div>
+          <input type="range" id="composeBleed" min="0" max="15" step="1" value="2">
+        </div>
+        <div class="control">
+          <div class="control-row"><label>Espacio entre diseños</label><span class="val" id="composeGapVal">2.0%</span></div>
+          <input type="range" id="composeGap" min="0" max="80" step="1" value="20">
+        </div>
+
+        <div class="section-title">Paper</div>
+        <div class="toggle-row" id="composePaper">
+          <button class="tog" data-paper="#d4cbc0" aria-selected="true">Cream</button>
+          <button class="tog" data-paper="#c9c3b4">Stone</button>
+          <button class="tog" data-paper="#e5dccd">Bone</button>
+        </div>
+        <div class="section-title">Diseños de esta hoja</div>
+        <div class="tip">«+ IMPORT» de arriba trae ficheros nuevos del disco a la galería. Este mete en <b>esta hoja</b> un diseño que ya tienes guardado.</div>
+        <button class="icon-btn wide" id="addFromGalleryBtn">+ AÑADIR DE LA GALERÍA</button>
+
+        <div class="section-title" style="margin-top:14px">Fondo</div>
+        <div class="toggle-row" id="composeBgModo">
+          <button class="tog" data-bg="papelFoto" aria-selected="true" title="El patron de marca, o tu foto, mezclado con el papel">PAPEL + FOTO</button>
+          <button class="tog" data-bg="sticker" title="Tu foto a sangre y los diseños como pegatinas">FOTO / STICKER</button>
+        </div>
+        <div class="bg-foto-fila">
+          <input type="file" id="bgFotoInput" accept="image/*" style="display:none">
+          <button class="icon-btn" id="bgFotoBtn">ELEGIR FOTO</button>
+          <button class="icon-btn" id="bgFotoGaleriaBtn">DE LA GALERÍA</button>
+          <button class="icon-btn" id="bgFotoQuitarBtn" disabled>QUITAR</button>
+        </div>
+        <div class="tip" id="bgFotoAviso" hidden>Elige una foto para este modo.</div>
+        <div class="control" id="bgPhotoLightRow" style="margin-top:12px">
+          <div class="control-row"><label>Luz del fondo</label><span class="val" id="bgPhotoLightVal">0.60</span></div>
+          <input type="range" id="composeBgPhotoLight" min="0" max="1" step="0.05" value="0.6">
+        </div>
+
+        <div class="section-title">Brand colors</div>
+        <div class="paper-custom" style="gap:14px">
+          <label style="display:flex;align-items:center;gap:6px;font-size:11px;letter-spacing:0.06em">
+            <input type="color" id="brandPrimaryPicker" value="#ff3d5c" title="Primary — magenta rojizo">
+            PRIMARY
+          </label>
+          <label style="display:flex;align-items:center;gap:6px;font-size:11px;letter-spacing:0.06em">
+            <input type="color" id="brandSecondaryPicker" value="#d4ff2f" title="Secondary — verde amarillento">
+            SECONDARY
+          </label>
+        </div>
+
+        <div class="section-title">Element colors</div>
+        <div id="elementColors" style="display:grid;grid-template-columns:auto 1fr;gap:6px 10px;align-items:center;font-size:11px;letter-spacing:0.06em"></div>
+
+        <div class="section-title">Brand</div>
+        <div class="control">
+          <div class="control-row"><label>Title</label></div>
+          <input class="text-input" type="text" id="composeTitle" value="@kaos.realm" maxlength="32">
+        </div>
+        <div class="font-picker" id="titleFontPicker" data-target="title"></div>
+
+        <div class="control">
+          <div class="control-row"><label>Handle</label></div>
+          <input class="text-input" type="text" id="composeHandle" value="DISEÑOS DISPONIBLES" maxlength="32">
+        </div>
+        <div class="font-picker" id="handleFontPicker" data-target="handle"></div>
+
+        <div class="section-title">Stamps</div>
+        <div class="control">
+          <div class="control-row"><label>Stamp text</label></div>
+          <input class="text-input" type="text" id="composeStampText" value="@KAOS.REALM" placeholder="(uses title)" maxlength="24">
+        </div>
+        <div class="control">
+          <div class="control-row"><label>Stamp count</label><span class="val" id="stampCountVal">3</span></div>
+          <input type="range" id="composeStamps" min="0" max="8" step="1" value="3">
+        </div>
+        <div class="control">
+          <div class="control-row"><label>Stamp size</label><span class="val" id="stampSizeVal">1.00</span></div>
+          <input type="range" id="composeStampSize" min="0.5" max="2.0" step="0.05" value="1.00">
+        </div>
+        <div class="control">
+          <div class="control-row"><label>Stamp opacity</label><span class="val" id="stampOpacityVal">0.80</span></div>
+          <input type="range" id="composeStampOpacity" min="0.2" max="1.0" step="0.02" value="0.80">
+        </div>
+
+        <div class="section-title" style="margin-top:8px">Footer</div>
+        <div class="control">
+          <div class="control-row"><label>Footer title (optional)</label></div>
+          <input class="text-input" type="text" id="composeFooterTitle" value="" placeholder="(none)" maxlength="40">
+        </div>
+        <div class="control">
+          <input class="text-input" type="text" id="composeFooter" value="Disponibles! Si os interesa alguno no dudeis en responderme a esta misma historia :)" maxlength="120">
+        </div>
+        <div class="control">
+          <div class="control-row"><label>Footer size</label><span class="val" id="footerSizeVal">1.00</span></div>
+          <input type="range" id="composeFooterSize" min="0.6" max="2.0" step="0.05" value="1.00">
+        </div>
+        <div class="control">
+          <div class="control-row"><label>Footer position</label></div>
+          <div class="toggle-row" id="composeFooterPos">
+            <button class="tog" data-footerpos="bottom" aria-selected="true">Bottom</button>
+            <button class="tog" data-footerpos="center">Center</button>
+            <button class="tog" data-footerpos="top">Top</button>
+          </div>
+        </div>
+
+        <div class="section-title">Finishing</div>
+        <div class="control">
+          <div class="control-row"><label>Drop shadow</label><span class="val" id="composeShadowVal">0.35</span></div>
+          <input type="range" id="composeShadow" min="0" max="1" step="0.01" value="0.35">
+        </div>
+        <label class="bg-toggle" style="margin-top:10px">
+          <input type="checkbox" id="composeXorChk">
+          <span class="box"></span>
+          <span class="lbl">CRUCES EN NEGATIVO</span>
+        </label>
+        <label class="bg-toggle" style="margin-top:10px">
+          <input type="checkbox" id="composeShowSizes" checked>
+          <span class="box"></span>
+          <span class="lbl">SHOW SIZE LABELS (CM)</span>
+        </label>
+
+        <div class="section-title" style="margin-top:10px">Corners</div>
+        <div class="toggle-row two" id="composeCorners">
+          <button class="tog" data-corner="ornament" aria-selected="true">Ornament</button>
+          <button class="tog" data-corner="none">None</button>
+        </div>
+
+        <div class="actions" style="margin-top:18px" id="flashActions">
+          <button class="btn ghost" id="shuffleBtn">SHUFFLE</button>
+          <button class="btn" id="exportCollageBtn">EXPORT</button>
+        </div>
+        <button class="btn ghost wide" id="exportStickerSheetBtn" style="margin-top:10px">EXPORT AS STICKER SHEET ↓</button>
+        <button class="btn ghost wide" id="sheetsEachComposeBtn" style="margin-top:10px">ONE SHEET EACH ↓</button>
+        <div class="actions" style="margin-top:10px; display:none" id="sheetActions">
+          <button class="btn ghost" id="exportThisSheetBtn">EXPORT THIS</button>
+          <button class="btn" id="exportAllSheetsBtn">EXPORT ALL</button>
+        </div>
+        <button class="btn ghost wide" id="stickersExportBtn" style="margin-top:10px">STICKERS (0.5 CM HALO) ↓</button>
+        <label class="bg-toggle" style="margin-top:8px">
+          <input type="checkbox" id="stickerWithFrameChk">
+          <span class="box"></span>
+          <span class="lbl">STICKER CON MARCO</span>
+        </label>
+        <button class="icon-btn wide" id="backToGalleryBtn" style="margin-top:10px">← BACK TO GALLERY</button>
+      </aside>
+    </div>
+  </div>
+</div>
+
+<!-- ============ SCAN NOTEBOOK MODAL ============ -->
+<div class="modal" id="scanModal" style="display:none">
+  <div class="modal-inner">
+    <div class="modal-head">
+      <div class="modal-title">
+        <span class="gothic">Escanear libreta</span>
+        <span class="modal-sub">foto → detecta diseños → PNG sin fondo</span>
+      </div>
+      <div class="modal-actions">
+        <input type="file" id="scanFileInput" accept="image/*,.heic,.heif,image/heic,image/heif" style="display:none">
+        <button class="icon-btn" id="scanReloadBtn">↻ CAMBIAR FOTO</button>
+        <button class="icon-btn" id="scanCloseBtn">✕ CLOSE</button>
+      </div>
+    </div>
+    <!-- Revision antes de guardar: enseña cada diseño YA recortado, deja
+         limpiarlo tipo vectorial y guardarlo suelto o mandarlo a la galeria. -->
+    <div class="scan-revision" id="scanRevision" hidden>
+      <div class="rev-barra">
+        <div class="rev-tit">
+          <span class="gothic-md">Así van a quedar</span>
+          <span class="hint" id="revCuenta">—</span>
+        </div>
+        <div class="rev-mandos">
+          <label class="chk"><input type="checkbox" id="revLimpiar" checked> LIMPIAR LÍNEAS</label>
+          <div class="control rev-ctrl">
+            <div class="control-row"><label>Suavizado</label><span class="val" id="revSuaveVal">5</span></div>
+            <input type="range" id="revSuave" min="0" max="14" step="1" value="5">
+          </div>
+          <div class="control rev-ctrl">
+            <div class="control-row"><label>Quitar motas</label><span class="val" id="revMotaVal">0.15</span></div>
+            <input type="range" id="revMota" min="0" max="150" step="5" value="15">
+          </div>
+          <button class="icon-btn" id="revTodosBtn">↓ GUARDAR TODOS</button>
+          <button class="icon-btn" id="revGaleriaBtn">★ TODOS A GALERÍA</button>
+          <button class="icon-btn" id="revVolverBtn">← VOLVER A LA FOTO</button>
+        </div>
+      </div>
+      <div class="rev-rejilla" id="revRejilla"></div>
+    </div>
+    <div class="scan-view">
+      <div class="scan-canvas-wrap" id="scanCanvasWrap" tabindex="0">
+        <div class="scan-canvas-inner" id="scanCanvasInner">
+          <canvas id="scanCanvas"></canvas>
+          <div id="scanBoxes" class="scan-boxes"></div>
+        </div>
+        <div class="scan-empty" id="scanEmpty">
+          <div class="gothic-md">sube la foto de tu libreta</div>
+          <div>ARRASTRA · PEGA · O CLICK PARA ELEGIR</div>
+          <div class="sub">se detectan los diseños solos.<br/>tú eliges cuáles guardar como PNG sin fondo.</div>
+        </div>
+      </div>
+      <aside class="scan-side">
+        <div class="section-title">Detección <span class="hint" id="scanCount">—</span></div>
+        <div class="tip">Toca los recuadros para marcar/desmarcar. Si la detección falla, <b>arrastra directamente sobre cada diseño</b> en la foto y toca la ✕ para quitar los que sobren.</div>
+        <div class="control">
+          <div class="control-row"><label>Sensibilidad</label><span class="val" id="scanSensVal">45</span></div>
+          <input type="range" id="scanSens" min="20" max="90" value="45">
+        </div>
+        <div class="control">
+          <div class="control-row"><label>Fusionar cerca</label><span class="val" id="scanMergeVal">22</span></div>
+          <input type="range" id="scanMerge" min="4" max="60" value="22">
+        </div>
+        <div class="control">
+          <div class="control-row"><label>Tamaño mínimo</label><span class="val" id="scanMinVal">4</span></div>
+          <input type="range" id="scanMin" min="1" max="20" value="4">
+        </div>
+        <button class="btn ghost wide" id="scanRedetectBtn" style="margin-top:6px">↻ RE-DETECTAR</button>
+        <button class="icon-btn wide" id="scanClearBtn" style="margin-top:6px">✕ LIMPIAR RECUADROS</button>
+        <div class="rule"></div>
+        <div class="section-title">Selección</div>
+        <div class="history-row">
+          <button class="icon-btn flex" id="scanAllBtn">TODOS</button>
+          <button class="icon-btn flex" id="scanNoneBtn">NINGUNO</button>
+        </div>
+        <div class="scan-list" id="scanList"></div>
+        <div class="rule"></div>
+        <div class="section-title">Salida</div>
+        <label class="bg-toggle">
+          <input type="checkbox" id="scanKeepTones">
+          <span class="box"></span>
+          <span class="lbl">PRESERVAR TONOS (color original)</span>
+        </label>
+        <label class="bg-toggle" style="margin-top:6px">
+          <input type="checkbox" id="scanAddGallery">
+          <span class="box"></span>
+          <span class="lbl">TAMBIÉN AÑADIR A LA GALERÍA</span>
+        </label>
+        <div class="control" style="margin-top:8px">
+          <div class="control-row"><label>Margen <span class="hint">/ 0 = ajustado a la silueta</span></label><span class="val" id="scanPadVal">0</span></div>
+          <input type="range" id="scanPad" min="0" max="20" value="0">
+        </div>
+        <button class="btn wide" id="scanExportBtn" style="margin-top:12px" disabled>VER CÓMO QUEDAN →</button>
+      </aside>
+    </div>
+  </div>
+</div>
+
+<!-- ============ AI DIALOG (auto-compose / prompt tweak / match scene) ============ -->
+<div class="ai-overlay" id="aiOverlay" style="display:none">
+  <div class="ai-card">
+    <div class="ai-head">
+      <div class="ai-title">
+        <span class="ai-bolt">✨</span>
+        <span id="aiTitle">AI Auto-compose</span>
+      </div>
+      <button class="icon-btn" id="aiCloseBtn">✕</button>
+    </div>
+    <div class="ai-body">
+      <div class="ai-section" id="aiModeBlock" style="display:none">
+        <div class="section-title">Qué hace Gemini con tu foto</div>
+        <div class="toggle-row two ai-mode-row" id="aiGemEditRow">
+          <button class="tog" data-gemedit="1" aria-selected="true">
+            <span class="ai-mode-title">EDITAR MI FOTO</span>
+            <span class="ai-mode-sub">manda la imagen actual y la retoca</span>
+          </button>
+          <button class="tog" data-gemedit="0">
+            <span class="ai-mode-title">CREAR NUEVA</span>
+            <span class="ai-mode-sub">imagen desde cero con el prompt</span>
+          </button>
+        </div>
+      </div>
+      <div class="ai-section" id="aiElementsBlock">
+        <div class="section-title">Elements <span class="hint">/ name each so the AI knows what it is</span></div>
+        <div class="ai-elements" id="aiElements"></div>
+      </div>
+      <div class="ai-section">
+        <div class="section-title" id="aiPromptLabel">Describe the final image</div>
+        <textarea class="ai-prompt" id="aiPromptInput" rows="4" placeholder="e.g. the cat wearing the spike collar, head-on portrait, the collar tight around the neck"></textarea>
+        <div class="ai-presets" id="aiPresets"></div>
+      </div>
+      <div class="ai-status" id="aiStatus"></div>
+    </div>
+    <div class="ai-foot">
+      <button class="btn ghost" id="aiCancelBtn">CANCEL</button>
+      <button class="btn" id="aiGoBtn">✨ GENERATE</button>
+    </div>
+  </div>
+</div>
+
+<!-- ============ AI VARIATIONS GRID ============ -->
+<div class="ai-overlay" id="aiVarOverlay" style="display:none">
+  <div class="ai-card wide">
+    <div class="ai-head">
+      <div class="ai-title"><span class="ai-bolt">✨</span> AI Variations</div>
+      <div style="display:flex; gap:6px">
+        <button class="icon-btn" id="aiVarRegen">REGENERATE</button>
+        <button class="icon-btn" id="aiVarCloseBtn">✕</button>
+      </div>
+    </div>
+    <div class="ai-body">
+      <div class="ai-var-grid" id="aiVarGrid"></div>
+      <div class="ai-status" id="aiVarStatus">Generating four directions on your current image…</div>
+    </div>
+  </div>
+</div>
+
+<!-- ============ HUGGING FACE / GRADIO CONNECT MODAL ============ -->
+<div class="ai-overlay" id="falModal" style="display:none">
+  <div class="ai-card">
+    <div class="ai-head">
+      <div class="ai-title">
+        <span class="ai-bolt">⚡</span>
+        <span>Generación de imágenes</span>
+      </div>
+      <button class="icon-btn" id="falModalCloseBtn">✕</button>
+    </div>
+    <div class="ai-body">
+      <div class="ai-section">
+        <div class="section-title">Proveedor</div>
+        <div class="toggle-row two ai-mode-row" id="genProviderRow">
+          <button class="tog" data-provider="gemini" aria-selected="true">
+            <span class="ai-mode-title">GOOGLE GEMINI</span>
+            <span class="ai-mode-sub">crea Y edita tu foto · API key gratis</span>
+          </button>
+          <button class="tog" data-provider="hf">
+            <span class="ai-mode-title">HUGGING FACE</span>
+            <span class="ai-mode-sub">Spaces públicos · suelen caerse</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- ---------- GEMINI ---------- -->
+      <div id="genGeminiBlock">
+        <div class="fal-blurb">
+          Gemini es el único de los dos que puede <b>editar la foto que ya tienes</b> (“ponle un casco”, “quítale el fondo”, “pasa esto a grabado”) además de generar desde cero.
+          Consigue una API key gratis en <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener">aistudio.google.com/apikey</a> — se guarda solo en este dispositivo.
+          <br><b>Vizcom no tiene API pública</b>, así que no se puede conectar desde aquí.
+        </div>
+        <div class="ai-section">
+          <div class="section-title">API key de Gemini</div>
+          <div class="fal-key-row">
+            <input class="text-input fal-key-input" type="password" id="gemKeyInput" placeholder="AIza…" autocomplete="off" spellcheck="false">
+            <button class="icon-btn" id="gemKeyShowBtn" title="Ver/ocultar">👁</button>
+          </div>
+        </div>
+        <div class="ai-section">
+          <div class="section-title">Modelo</div>
+          <div class="fal-models" id="gemModelList"></div>
+        </div>
+        <label class="bg-toggle">
+          <input type="checkbox" id="gemEditChk" checked>
+          <span class="box"></span>
+          <span class="lbl">MANDAR MI FOTO ACTUAL (EDITAR EN VEZ DE CREAR)</span>
+        </label>
+      </div>
+
+      <!-- ---------- HUGGING FACE ---------- -->
+      <div id="genHfBlock" style="display:none">
+      <div class="fal-blurb">
+        Llama a un <b>HF Gradio Space</b> público desde el navegador.
+        <b>Solo texto→imagen</b> en la mayoría: crea una imagen NUEVA, no edita la tuya.
+      </div>
+
+      <div class="ai-section">
+        <div class="section-title">Space</div>
+        <div class="fal-models" id="falModelList"></div>
+      </div>
+
+      <div class="ai-section">
+        <div class="section-title">HF token <span class="hint">/ opcional</span></div>
+        <div class="fal-key-row">
+          <input class="text-input fal-key-input" type="password" id="falKeyInput" placeholder="hf_xxx... — sube el límite de llamadas anónimas" autocomplete="off" spellcheck="false">
+          <button class="icon-btn" id="falKeyShowBtn" title="Show/hide">👁</button>
+        </div>
+        <div class="fal-key-hint" id="falKeyHint">Las llamadas anónimas funcionan pero están muy limitadas. <a href="https://huggingface.co/settings/tokens" target="_blank" rel="noopener">Consigue un token HF gratis</a>.</div>
+      </div>
+
+      <div class="ai-section">
+        <div class="section-title">Generation params</div>
+        <div class="control">
+          <div class="control-row"><label>Steps</label><span class="val" id="hfStepsVal">4</span></div>
+          <input type="range" id="hfSteps" min="1" max="8" step="1" value="4">
+        </div>
+        <div class="control">
+          <div class="control-row"><label>Guidance</label><span class="val" id="hfGuidanceVal">1.50</span></div>
+          <input type="range" id="hfGuidance" min="0" max="3" step="0.1" value="1.5">
+        </div>
+        <div class="control">
+          <div class="control-row"><label>Resolution</label><span class="val" id="hfSizeVal">1024</span></div>
+          <input type="range" id="hfSize" min="512" max="1280" step="64" value="1024">
+        </div>
+      </div>
+      </div>
+
+      <div class="ai-status" id="falModalStatus"></div>
+    </div>
+    <div class="ai-foot">
+      <button class="btn ghost" id="falDisconnectBtn">RESET</button>
+      <button class="btn" id="falSaveBtn">SAVE</button>
+    </div>
+  </div>
+</div>
+
+<!-- =================== POST EDIT =================== -->
+<!-- El editor de fotos entero, servido por Python y reenviado por server.js.
+     Va en un iframe a propósito: son 1300 líneas que ya funcionan (recorte,
+     profundidad, neón, gizmos, proyectos guardados) y reescribirlas sólo para
+     que compartan pestaña sería cambiar algo que va bien por algo por probar.
+     Desde fuera es una sección más, y sale de la misma dirección. -->
+<div class="modal" id="postEditModal" style="display:none">
+  <div class="modal-inner">
+    <div class="modal-head">
+      <div class="modal-title">
+        <span class="gothic">Post Edit</span>
+        <span class="modal-sub">foto cruda → fondo de neón → logo → JPG listo para publicar</span>
+      </div>
+      <div class="modal-actions">
+        <button class="icon-btn" id="postEditReloadBtn" title="Volver a cargar el editor">↻ RECARGAR</button>
+        <button class="icon-btn" id="postEditCloseBtn">✕ CLOSE</button>
+      </div>
+    </div>
+    <div class="postedit-wrap">
+      <!-- El título y el texto los reescribe postedit.js con el motivo real:
+           desde el iPad no hay consola, así que si el panel no dice cuál de
+           los fallos posibles es, no hay forma de averiguarlo. -->
+      <div class="postedit-down" id="postEditDown" hidden>
+        <div class="gothic-md" id="postEditDownTitle">comprobando…</div>
+        <p id="postEditDownText">Un momento.</p>
+        <button class="btn" id="postEditRetryBtn">REINTENTAR</button>
+        <code class="postedit-diag" id="postEditDiag"></code>
+      </div>
+      <!-- src se pone al abrir, no aquí: si no, el navegador cargaría el
+           editor (y descargaría el modelo) aunque ella nunca lo abriese. -->
+      <iframe id="postEditFrame" title="KAOS Auto Edit" allow="clipboard-write"></iframe>
+    </div>
+  </div>
+</div>
+
+<!-- =================== IDEAS =================== -->
+<div class="modal" id="ideasModal" style="display:none">
+  <div class="modal-inner">
+    <div class="modal-head">
+      <div class="modal-title">
+        <span class="gothic">Ideas</span>
+        <span class="modal-sub">lo que te piden · lo que se te ocurre · lo que vas a dibujar</span>
+      </div>
+      <div class="modal-actions">
+        <button class="icon-btn" id="ideasCloseBtn">✕ CLOSE</button>
+      </div>
+    </div>
+
+    <div class="ideas-tabs" id="ideasTabs">
+      <button class="ideas-tab" data-pane="gen" aria-selected="true">GENERAR</button>
+      <button class="ideas-tab" data-pane="saved">GUARDADAS <span class="ideas-count" id="ideasCountSaved">0</span></button>
+      <button class="ideas-tab" data-pane="notes">PETICIONES <span class="ideas-count" id="ideasCountNotes">0</span></button>
+      <button class="ideas-tab" data-pane="estilo">ESTILO <span class="ideas-count" id="ideasCountRefs">0</span></button>
+    </div>
+
+    <div class="ideas-body">
+
+      <!-- ---------- GENERAR ---------- -->
+      <section class="ideas-pane" data-pane="gen">
+        <div class="ideas-genbar">
+          <button class="btn ideas-roll" id="ideasRollBtn">✦ DAME 5 IDEAS</button>
+          <select class="ideas-estilo-sel" id="ideasEstiloSel" title="Estilo en el que vas a tatuar"></select>
+          <span class="ideas-engine" id="ideasEngine">—</span>
+        </div>
+        <div class="tip" id="ideasGenTip">
+          👍 la guarda en tu lista de diseños por hacer. 👎 también cuenta: con los descartes
+          aprendo qué <b>no</b> te encaja y dejo de proponértelo.
+        </div>
+        <div class="ideas-list" id="ideasGenList"></div>
+        <div class="ideas-empty" id="ideasGenEmpty">
+          <div class="gothic-md">nada todavía.</div>
+          <div>dale a DAME 5 IDEAS</div>
+        </div>
+      </section>
+
+      <!-- ---------- GUARDADAS ---------- -->
+      <section class="ideas-pane" data-pane="saved" hidden>
+        <div class="tip">Tu lista de diseños por hacer. De cada una puedes sacar referencias
+          reales de internet, pedirle la imagen a la IA, o calcular el precio que irá en el flash.</div>
+        <div class="ideas-list" id="ideasSavedList"></div>
+        <div class="ideas-empty" id="ideasSavedEmpty">
+          <div class="gothic-md">lista vacía.</div>
+          <div>guarda ideas con 👍 desde GENERAR</div>
+        </div>
+      </section>
+
+      <!-- ---------- ESTILO (referencias visuales) ---------- -->
+      <section class="ideas-pane" data-pane="estilo" hidden>
+        <div class="tip">
+          Mete aquí fotos de tatuajes o flashes que te gusten. Yo las miro, digo en qué estilo
+          caen y apunto <b>qué</b> las hace ser de ese estilo. Esa lectura te la devuelvo cada vez
+          que pides ideas, así que cuantas más metas, más se parecen las ideas a lo que haces tú.
+          Las fotos se guardan sólo en este aparato.
+        </div>
+        <div class="ideas-genbar">
+          <select class="ideas-estilo-sel" id="refsEstiloSel"></select>
+          <input type="file" id="moodInput" accept="image/*" multiple style="display:none">
+          <button class="icon-btn" id="moodAddBtn">+ AÑADIR FOTOS</button>
+          <button class="icon-btn" id="moodFromGalleryBtn">DE LA GALERÍA</button>
+          <button class="icon-btn" id="moodReadBtn">LEER LAS QUE FALTAN</button>
+          <span class="ideas-engine" id="moodStatus">—</span>
+        </div>
+        <div class="mood-grid" id="moodGrid"></div>
+        <div class="ideas-empty" id="moodEmpty">
+          <div class="gothic-md">sin referencias.</div>
+          <div>añade fotos del estilo que más haces</div>
+        </div>
+      </section>
+
+      <!-- ---------- PETICIONES ---------- -->
+      <section class="ideas-pane" data-pane="notes" hidden>
+        <div class="tip">
+          <b>Instagram no da esto.</b> Su API deja ver alcance y seguidores, pero
+          <b>no</b> los votos de las encuestas ni las respuestas a las preguntas de tus historias
+          — Meta nunca ha abierto ese dato a nadie. Así que esto se escribe a mano, y es
+          lo que más peso tiene cuando te propongo ideas.
+        </div>
+        <div class="ideas-addrow">
+          <input type="text" id="ideasNoteInput" placeholder="p. ej. gato con alas de polilla" maxlength="120">
+          <div class="toggle-row ideas-kind" id="ideasNoteKind">
+            <button class="tog" data-kind="pedido" aria-selected="true">ME LO PIDEN</button>
+            <button class="tog" data-kind="agotado">AGOTADO Y LO PIDEN</button>
+          </div>
+          <button class="btn" id="ideasNoteAddBtn">APUNTAR</button>
+        </div>
+        <div class="ideas-list" id="ideasNotesList"></div>
+        <div class="ideas-empty" id="ideasNotesEmpty">
+          <div class="gothic-md">sin peticiones.</div>
+          <div>apunta lo que te pidan y las ideas saldrán de ahí</div>
+        </div>
+      </section>
+
+    </div>
+  </div>
+</div>
+
+<!-- =================== REFERENCIAS =================== -->
+<div class="modal" id="refsModal" style="display:none">
+  <div class="modal-inner">
+    <div class="modal-head">
+      <div class="modal-title">
+        <span class="gothic">Referencias</span>
+        <span class="modal-sub" id="refsSubtitle">—</span>
+      </div>
+      <div class="modal-actions">
+        <button class="icon-btn" id="refsSendBtn" disabled>→ AL COMPOSER (0)</button>
+        <button class="icon-btn" id="refsCloseBtn">✕ CLOSE</button>
+      </div>
+    </div>
+    <div class="refs-bar">
+      <div class="refs-chips" id="refsChips"></div>
+      <div class="refs-search">
+        <input type="text" id="refsInput" placeholder="buscar otra cosa…" maxlength="60">
+        <button class="icon-btn" id="refsSearchBtn">BUSCAR</button>
+      </div>
+    </div>
+    <div class="refs-status" id="refsStatus">Toca un elemento de arriba para ver fotos reales.</div>
+    <div class="refs-grid" id="refsGrid"></div>
+  </div>
+</div>
+
+<!-- =================== CARRUSEL =================== -->
+<!-- ============ REEL DE RULETA ============ -->
+<div class="modal" id="mandalaModal" style="display:none">
+  <div class="modal-inner">
+    <div class="modal-head">
+      <div class="modal-title">
+        <span class="gothic">Mini mandalas</span>
+        <span class="modal-sub">ornamentos pequeños para flash day · tinta maciza · listos para tatuar</span>
+      </div>
+      <div class="modal-actions">
+        <button class="icon-btn" id="mandalaCloseBtn">✕ CERRAR</button>
+      </div>
+    </div>
+    <div class="mand-body">
+      <aside class="mand-side">
+        <div class="tip">
+          Se dibujan solos, sin IA y sin conexión. Cada vuelta son piezas nuevas:
+          tira, quédate con las que te gusten y van a la galería.
+        </div>
+
+        <div class="section-title">Qué sale</div>
+        <div class="mand-fams" id="mandalaFamilias"></div>
+        <div class="control-row" style="margin-top:8px"><label>Cuántas por vuelta</label></div>
+        <select class="ideas-estilo-sel" id="mandalaCuantas">
+          <option value="12" selected>12</option>
+          <option value="18">18</option>
+          <option value="24">24</option>
+        </select>
+
+        <div class="section-title" style="margin-top:14px">Tamaño</div>
+        <div class="control-row"><label>Cuánto miden</label><span class="val" id="mandalaCmVal">4 cm</span></div>
+        <input type="range" id="mandalaCm" min="2" max="10" step="1" value="4">
+        <div class="tip" id="mandalaPrecio"></div>
+
+        <label class="mand-check" style="margin-top:12px">
+          <input type="checkbox" id="mandalaFlashDay" checked>
+          <span>Marcarlas como FLASH DAY al guardarlas</span>
+        </label>
+
+        <div class="bg-foto-fila" style="margin-top:16px">
+          <button class="icon-btn" id="mandalaRollBtn">↻ OTRA VUELTA</button>
+          <button class="icon-btn" id="mandalaTodasBtn">TODAS</button>
+        </div>
+        <div class="bg-foto-fila" style="margin-top:8px">
+          <button class="icon-btn" id="mandalaComposeBtn" disabled>→ AL COLLAGE</button>
+          <button class="btn" id="mandalaAddBtn" disabled>AÑADIR A LA GALERÍA</button>
+        </div>
+        <div class="tip" id="mandalaStatus">—</div>
+      </aside>
+      <div class="mand-grid" id="mandalaGrid"></div>
+    </div>
+  </div>
+</div>
+
+<div class="modal" id="reelModal" style="display:none">
+  <div class="modal-inner">
+    <div class="modal-head">
+      <div class="modal-title">
+        <span class="gothic">Reel ruleta</span>
+        <span class="modal-sub">1080×1920 · para stories y reels</span>
+      </div>
+      <div class="modal-actions">
+        <button class="icon-btn" id="reelCloseBtn">✕ CERRAR</button>
+      </div>
+    </div>
+    <div class="reel-body">
+      <div class="reel-previa">
+        <canvas id="reelCanvas"></canvas>
+      </div>
+      <aside class="reel-side">
+        <div class="tip">
+          Los diseños salen como pegatinas recortadas, cada uno con un fondo distinto.
+          Empieza rapidísimo y va frenando hasta pararse en uno.
+        </div>
+
+        <div class="section-title">Diseños de la ruleta</div>
+        <div class="reel-tira" id="reelTira"></div>
+        <div class="bg-foto-fila">
+          <button class="icon-btn" id="reelAddBtn">+ AÑADIR</button>
+          <button class="icon-btn" id="reelFlashDayBtn">TODO EL FLASH DAY</button>
+          <button class="icon-btn" id="reelClearBtn">VACIAR</button>
+        </div>
+        <div class="control-row" style="margin-top:8px"><label>Desde una hoja guardada</label></div>
+        <select class="ideas-estilo-sel" id="reelHojaSel"><option value="">— elige una hoja —</option></select>
+
+        <div class="section-title" style="margin-top:14px">Texto</div>
+        <input type="text" id="reelFrase" maxlength="40" placeholder="Frase de arriba">
+        <input type="text" id="reelCta" maxlength="40" placeholder="CTA de abajo" style="margin-top:6px">
+        <div class="control-row" style="margin-top:8px"><label>Color de la frase</label></div>
+        <select class="ideas-estilo-sel" id="reelColFrase"></select>
+        <div class="control-row" style="margin-top:6px"><label>Color del marco</label></div>
+        <select class="ideas-estilo-sel" id="reelColMarco"></select>
+        <div class="tip" id="reelMarcoAviso" hidden>Marco y frase del mismo color: el marco deja de enmarcar y compite con el titular.</div>
+        <div class="control-row" style="margin-top:6px"><label>Color del CTA</label></div>
+        <select class="ideas-estilo-sel" id="reelColCta"></select>
+        <div class="control-row" style="margin-top:6px"><label>Color del logo y el @</label></div>
+        <select class="ideas-estilo-sel" id="reelColHandle"></select>
+
+        <div class="section-title" style="margin-top:14px">Duración</div>
+        <div class="control-row"><label>Segundos</label><span class="val" id="reelDurVal">8s</span></div>
+        <input type="range" id="reelDur" min="4" max="15" step="1" value="8">
+
+        <div class="section-title" style="margin-top:14px">Fondo</div>
+        <div class="control-row"><label>Cuál</label></div>
+        <select class="ideas-estilo-sel" id="reelFondoSel"></select>
+        <div class="tip">El fondo se queda quieto todo el reel; lo único que cambia es el diseño.</div>
+        <div class="bg-foto-fila">
+          <input type="file" id="reelVideoInput" accept="video/*" style="display:none">
+          <button class="icon-btn" id="reelVideoBtn">VÍDEO DE FONDO</button>
+          <button class="icon-btn" id="reelVideoQuitBtn" disabled>QUITAR VÍDEO</button>
+        </div>
+        <div class="bg-foto-fila" style="margin-top:6px">
+          <input type="file" id="reelFondoInput" accept="image/*" multiple style="display:none">
+          <button class="icon-btn" id="reelFondoBtn">+ FOTOS DE FONDO</button>
+        </div>
+
+        <div class="bg-foto-fila" style="margin-top:16px">
+          <button class="icon-btn" id="reelPlayBtn" disabled>▶ PREVIA</button>
+          <button class="btn" id="reelRecBtn" disabled>● GRABAR REEL</button>
+        </div>
+        <div class="tip" id="reelStatus">—</div>
+        <div class="tip warn" id="reelAviso" hidden>
+          <b>Ha salido en WebM y a Instagram no le vale.</b> Este navegador no sabe grabar MP4.
+          Si abres esta misma página en el <b>iPad (Safari)</b> y grabas allí, sale MP4 directo.
+        </div>
+      </aside>
+    </div>
+  </div>
+</div>
+
+<div class="modal" id="carruselModal" style="display:none">
+  <div class="modal-inner">
+    <div class="modal-head">
+      <div class="modal-title">
+        <span class="gothic">Carrusel</span>
+        <span class="modal-sub" id="carruselSub">plantilla → escribes → listo para Instagram</span>
+      </div>
+      <div class="modal-actions">
+        <span class="carr-estado" id="carruselEstado"></span>
+        <button class="icon-btn" id="carruselCloseBtn">✕ CLOSE</button>
+      </div>
+    </div>
+
+    <!-- ---------- elegir plantilla ---------- -->
+    <div class="carr-inicio" id="carruselInicio">
+      <div class="tip">
+        Cada plantilla ya viene escrita siguiendo tu brand book: <b>gancho con pregunta</b>
+        en la portada, verde lima para tu firma y el texto, y el magenta sólo de acento.
+        Cambia lo que quieras — sólo se guarda aquí, en este aparato.
+      </div>
+      <div class="carr-plantillas" id="carruselPlantillas"></div>
+      <div class="carr-guardados" id="carruselGuardados"></div>
+    </div>
+
+    <!-- ---------- editor ---------- -->
+    <div class="carr-editor" id="carruselEditor" hidden>
+      <div class="carr-barra">
+        <button class="icon-btn" id="carruselVolverBtn">← PLANTILLAS</button>
+        <input type="text" id="carruselTitulo" class="carr-titulo" maxlength="60"
+               placeholder="nombre del carrusel">
+        <button class="icon-btn" id="carruselGuardarBtn">GUARDAR</button>
+        <button class="btn" id="carruselExportBtn">↓ EXPORTAR TODAS</button>
+      </div>
+      <div class="carr-tira" id="carruselTira"></div>
+      <div class="carr-obra">
+        <canvas id="carruselLienzo" class="carr-lienzo" width="432" height="540"></canvas>
+        <div class="carr-campos" id="carruselCampos"></div>
+      </div>
+    </div>
+  </div>
+  <input type="file" id="carruselFichero" accept="image/*" hidden>
+</div>
+
+<script src="guardar.js?v=1"></script>
+<script src="limpiar.js?v=9"></script>
+<script src="processing.js?v=9"></script>
+<script src="gallery.js?v=16"></script>
+<script src="store.js?v=11"></script>
+<script src="ai.js?v=9"></script>
+<script src="gemini.js?v=9"></script>
+<script src="hf.js?v=9"></script>
+<script src="precio.js?v=1"></script>
+<script src="surreal.js?v=27"></script>
+<script src="app.js?v=38"></script>
+<script src="scan.js?v=14"></script>
+<!-- ideas: necesita KAOS_HF, KAOS_PRECIO y KAOS_SURREAL ya cargados -->
+<script src="ideas.js?v=9"></script>
+<script src="ideas-ui.js?v=3"></script>
+<script src="postedit.js?v=2"></script>
+<!-- carrusel: la interfaz necesita KAOS_CARRUSEL y KAOS_GALLERY ya cargados -->
+<script src="carrusel.js?v=9"></script>
+<script src="carrusel-ui.js?v=10"></script>
+<script src="reel.js?v=4"></script>
+<script src="reel-ui.js?v=4"></script>
+<script src="contornos.js?v=4"></script>
+<script src="mandalas.js?v=15"></script>
+<script src="mandalas-ui.js?v=10"></script>
+<!-- last: needs KAOS_STORE / KAOS_GALLERY / KAOS_TOAST to already exist -->
+<script src="sync.js?v=3"></script>
+<!-- Local-only interaction log. Console: KAOS_USAGE.report() -->
+<script src="usage.js?v=3"></script>
+</body>
+</html>
