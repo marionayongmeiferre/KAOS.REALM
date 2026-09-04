@@ -10,7 +10,10 @@
 #     mkdir "C:\CLAUDE_TREBALLS"
 #     cd "C:\CLAUDE_TREBALLS"
 #     git clone https://github.com/marionayongmeiferre/KAOS.REALM.git TATTOO_FLASH_CREATOR
-#     & ".\TATTOO_FLASH_CREATOR\BAJAR-TODO.ps1" -Primera
+#     & ".\TATTOO_FLASH_CREATOR\BAJAR-TODO.ps1" -Primera -SoyElDuenio
+#
+# El "-SoyElDuenio" deja este ordenador como el sitio donde viven los
+# originales de la galeria. Se pone UNA sola vez, en el que quieras que mande.
 #
 # El "-Primera" clona los otros tres. A partir de ahi, cada vez que quieras
 # ponerte al dia, solo esto y nada mas:
@@ -20,7 +23,10 @@
 # La ruta no esta escrita dentro del script: sale de donde este el propio
 # fichero. Si manana lo mueves a otro sitio, sigue funcionando.
 
-param([switch]$Primera)
+# -SoyElDuenio marca ESTE ordenador como el sitio donde viven los originales de
+# la galeria. Se pone UNA vez, en el ordenador que quieras que mande. A partir
+# de ahi ese sube la galeria y el otro solo la recibe.
+param([switch]$Primera, [switch]$SoyElDuenio)
 
 $ErrorActionPreference = "Continue"
 # La carpeta madre sale de DONDE ESTA ESTE SCRIPT, no escrita a mano: el script
@@ -88,6 +94,44 @@ if ($soyDuenio) {
   Write-Host "  galeria: puesta"
 } else {
   Write-Host "  galeria: no venia ninguna"
+}
+
+# El cartel de dueno se pone DESPUES de restaurar la galeria, no antes: si se
+# pusiera antes, el bloque de arriba se saltaria la restauracion por creer que
+# aqui ya estaban los originales, y este ordenador se quedaria sin ellos.
+if ($SoyElDuenio) {
+  $cartel = Join-Path $Raiz "ORIGINALES-AQUI.txt"
+  @"
+ESTE ORDENADOR ES EL DUENO DE LA GALERIA
+========================================
+
+Mientras este fichero este aqui:
+
+  · SUBIR-TODO.ps1  sube tu galeria a GitHub desde este ordenador.
+  · BAJAR-TODO.ps1  NO la toca. Nunca sobrescribe los originales.
+
+En el otro ordenador este fichero NO esta, y por eso alli pasa al reves:
+recibe la galeria al bajar, y al subir no la manda. Asi no puede pisar la
+buena.
+
+El codigo si va y viene en las dos direcciones. Eso no da problemas: git
+sabe juntar cambios. Lo que no se puede juntar es la galeria, porque es un
+fichero grande de imagenes que viaja entero.
+
+SI ALGUN DIA QUIERES CAMBIAR DE DUENO
+-------------------------------------
+Sube desde aqui por ultima vez, baja en el otro, y alli ejecuta:
+    BAJAR-TODO.ps1 -SoyElDuenio
+Luego borra este fichero.
+
+POR QUE NO VA A GITHUB
+----------------------
+Vive fuera de los repositorios a proposito. Si viajara, los dos ordenadores
+se creerian el dueno y volveriamos al problema de que uno pisa al otro.
+"@ | Set-Content -Path $cartel -Encoding utf8
+  Write-Host ""
+  Write-Host "  *** ESTE ORDENADOR ES AHORA EL DUENO DE LA GALERIA ***"
+  Write-Host "  (cartel puesto en $cartel)"
 }
 
 # --- memorias de Claude ---------------------------------------------------
