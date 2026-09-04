@@ -68,7 +68,13 @@ Write-Host "=== GALERIA Y MEMORIAS ==="
 $sincro = Join-Path $Flash "sincro"
 $galeria = Join-Path $sincro "galeria.json"
 $dataDir = Join-Path $Flash ".data"
-if (Test-Path $galeria) {
+# Si ESTE ordenador es el dueno de la galeria (tiene ORIGINALES-AQUI.txt), no
+# se toca. Bajar aqui seria pisar los originales con una copia que puede ser
+# de ayer. Ver el comentario largo de SUBIR-TODO.ps1.
+$soyDuenio = Test-Path (Join-Path $Raiz "ORIGINALES-AQUI.txt")
+if ($soyDuenio) {
+  Write-Host "  galeria: NO la toco, los originales estan aqui"
+} elseif (Test-Path $galeria) {
   if (-not (Test-Path $dataDir)) { New-Item -ItemType Directory -Force $dataDir | Out-Null }
   $destino = Join-Path $dataDir "state.json"
   # Si aqui ya habia una galeria, se guarda con fecha ANTES de pisarla. Nunca

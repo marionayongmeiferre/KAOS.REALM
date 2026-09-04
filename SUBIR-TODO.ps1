@@ -36,8 +36,23 @@ Write-Host "=== PREPARANDO LO QUE NO ES CODIGO ==="
 # --- la galeria -----------------------------------------------------------
 $sincro = Join-Path $Flash "sincro"
 if (-not (Test-Path $sincro)) { New-Item -ItemType Directory -Force $sincro | Out-Null }
+# QUIEN MANDA EN LA GALERIA
+#
+# La galeria viaja como un fichero entero: al subirla REEMPLAZA la que hubiera,
+# no la junta. Con dos ordenadores subiendo, el ultimo borraria el trabajo del
+# otro sin avisar.
+#
+# Por eso hay un dueno. El ordenador que tenga ORIGINALES-AQUI.txt en su
+# carpeta madre es el que sube la galeria; el otro solo la recibe y no la sube
+# nunca. Asi los originales estan siempre en un sitio y no se pueden perder
+# trabajando en los dos.
+#
+# Ese fichero NO va a GitHub: si viajara, los dos se creerian el dueno.
+$soyDuenio = Test-Path (Join-Path $Raiz "ORIGINALES-AQUI.txt")
 $estado = Join-Path $Flash ".data\state.json"
-if (Test-Path $estado) {
+if (-not $soyDuenio) {
+  Write-Host "  galeria: no la subo (los originales estan en el otro ordenador)"
+} elseif (Test-Path $estado) {
   Copy-Item $estado (Join-Path $sincro "galeria.json") -Force
   $mb = [math]::Round((Get-Item $estado).Length / 1MB, 1)
   Write-Host "  galeria: $mb MB"
