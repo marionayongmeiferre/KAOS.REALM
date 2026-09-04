@@ -23,7 +23,11 @@
 # y venv. Ni son tuyos ni hacen falta fuera de este ordenador.
 
 $ErrorActionPreference = "Continue"
-$Raiz = "C:\3D DOCUMENTS\TATTOO"
+# La carpeta madre sale de DONDE ESTA ESTE SCRIPT, no escrita a mano: el script
+# vive en <raiz>\TATTOO_FLASH_CREATOR, asi que la raiz es la carpeta de encima.
+# Asi funciona igual en "C:\3D DOCUMENTS\TATTOO" que en "C:\CLAUDE_TREBALLS" o
+# donde sea, sin tocar una linea.
+$Raiz = Split-Path $PSScriptRoot -Parent
 $Flash = Join-Path $Raiz "TATTOO_FLASH_CREATOR"
 
 Write-Host ""

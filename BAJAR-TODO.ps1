@@ -5,22 +5,29 @@
 #     & "C:\3D DOCUMENTS\TATTOO\TATTOO_FLASH_CREATOR\BAJAR-TODO.ps1"
 #
 # LA PRIMERA VEZ DE TODAS hay que traerse un repositorio a mano, porque este
-# script vive dentro de el. Son cuatro lineas, pegadas de una vez:
+# script vive dentro de el. Cuatro lineas, pegadas de una vez:
 #
-#     mkdir "C:\3D DOCUMENTS\TATTOO"
-#     cd "C:\3D DOCUMENTS\TATTOO"
+#     mkdir "C:\CLAUDE_TREBALLS"
+#     cd "C:\CLAUDE_TREBALLS"
 #     git clone https://github.com/marionayongmeiferre/KAOS.REALM.git TATTOO_FLASH_CREATOR
 #     & ".\TATTOO_FLASH_CREATOR\BAJAR-TODO.ps1" -Primera
 #
 # El "-Primera" clona los otros tres. A partir de ahi, cada vez que quieras
 # ponerte al dia, solo esto y nada mas:
 #
-#     & "C:\3D DOCUMENTS\TATTOO\TATTOO_FLASH_CREATOR\BAJAR-TODO.ps1"
+#     & "C:\CLAUDE_TREBALLS\TATTOO_FLASH_CREATOR\BAJAR-TODO.ps1"
+#
+# La ruta no esta escrita dentro del script: sale de donde este el propio
+# fichero. Si manana lo mueves a otro sitio, sigue funcionando.
 
 param([switch]$Primera)
 
 $ErrorActionPreference = "Continue"
-$Raiz = "C:\3D DOCUMENTS\TATTOO"
+# La carpeta madre sale de DONDE ESTA ESTE SCRIPT, no escrita a mano: el script
+# vive en <raiz>\TATTOO_FLASH_CREATOR, asi que la raiz es la carpeta de encima.
+# Asi funciona igual en "C:\3D DOCUMENTS\TATTOO" que en "C:\CLAUDE_TREBALLS" o
+# donde sea, sin tocar una linea.
+$Raiz = Split-Path $PSScriptRoot -Parent
 $Flash = Join-Path $Raiz "TATTOO_FLASH_CREATOR"
 
 # Nombre de carpeta -> repositorio. Los nombres de carpeta IMPORTAN: hay codigo
@@ -81,8 +88,32 @@ if (Test-Path $galeria) {
 $mem = Join-Path $sincro "claude-memoria"
 if (Test-Path $mem) {
   $claudeProj = Join-Path $env:USERPROFILE ".claude\projects"
+  # Primero, tal cual venian.
   Get-ChildItem $mem -Directory | ForEach-Object {
     robocopy $_.FullName (Join-Path $claudeProj (Join-Path $_.Name "memory")) /E /R:1 /W:1 /NFL /NDL /NJH /NJS | Out-Null
+  }
+
+  # Y ADEMAS con el nombre que le toca en ESTE ordenador.
+  #
+  # Claude nombra la carpeta de memoria a partir de la ruta de trabajo:
+  # "C:\3D DOCUMENTS\TATTOO" se convierte en "C--3D-DOCUMENTS-TATTOO". Si aqui
+  # la carpeta esta en otro sitio, el nombre es otro y Claude no encontraria
+  # nada — tendria la memoria en el disco y aun asi no sabria quien eres.
+  #
+  # Como no esta escrito en ninguna parte si el guion bajo se cambia o se
+  # respeta, se dejan las DOS versiones. Son 55 KB: sale mas barato copiar de
+  # mas que adivinar mal.
+  $origen = Join-Path $mem "C--3D-DOCUMENTS-TATTOO"
+  if (Test-Path $origen) {
+    $claves = @(
+      ($Raiz -replace '[^A-Za-z0-9_]', '-'),
+      ($Raiz -replace '[^A-Za-z0-9]', '-')
+    ) | Select-Object -Unique
+    foreach ($k in $claves) {
+      if ($k -eq "C--3D-DOCUMENTS-TATTOO") { continue }
+      robocopy $origen (Join-Path $claudeProj (Join-Path $k "memory")) /E /R:1 /W:1 /NFL /NDL /NJH /NJS | Out-Null
+      Write-Host "  memorias tambien como: $k"
+    }
   }
   Write-Host "  memorias de Claude: puestas"
 }
