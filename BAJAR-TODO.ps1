@@ -2,7 +2,11 @@
 #
 # En el OTRO ordenador. Trae todo de GitHub y lo deja funcionando.
 #
-#     & "C:\3D DOCUMENTS\TATTOO\TATTOO_FLASH_CREATOR\BAJAR-TODO.ps1"
+#     powershell -ExecutionPolicy Bypass -File "C:\CLAUDE_TREBALLS\TATTOO_FLASH_CREATOR\BAJAR-TODO.ps1"
+#
+# EL "-ExecutionPolicy Bypass" HACE FALTA. Windows viene de fabrica sin dejar
+# ejecutar scripts, y sin eso sale "la ejecucion de scripts esta deshabilitada
+# en este sistema". No cambia nada del sistema: vale solo para esa vez.
 #
 # LA PRIMERA VEZ DE TODAS hay que traerse un repositorio a mano, porque este
 # script vive dentro de el. Cuatro lineas, pegadas de una vez:
@@ -10,7 +14,7 @@
 #     mkdir "C:\CLAUDE_TREBALLS"
 #     cd "C:\CLAUDE_TREBALLS"
 #     git clone https://github.com/marionayongmeiferre/KAOS.REALM.git TATTOO_FLASH_CREATOR
-#     & ".\TATTOO_FLASH_CREATOR\BAJAR-TODO.ps1" -Primera -SoyElDuenio
+#     powershell -ExecutionPolicy Bypass -File ".\TATTOO_FLASH_CREATOR\BAJAR-TODO.ps1" -Primera -SoyElDuenio
 #
 # El "-SoyElDuenio" deja este ordenador como el sitio donde viven los
 # originales de la galeria. Se pone UNA sola vez, en el que quieras que mande.
@@ -18,7 +22,7 @@
 # El "-Primera" clona los otros tres. A partir de ahi, cada vez que quieras
 # ponerte al dia, solo esto y nada mas:
 #
-#     & "C:\CLAUDE_TREBALLS\TATTOO_FLASH_CREATOR\BAJAR-TODO.ps1"
+#     powershell -ExecutionPolicy Bypass -File "C:\CLAUDE_TREBALLS\TATTOO_FLASH_CREATOR\BAJAR-TODO.ps1"
 #
 # La ruta no esta escrita dentro del script: sale de donde este el propio
 # fichero. Si manana lo mueves a otro sitio, sigue funcionando.

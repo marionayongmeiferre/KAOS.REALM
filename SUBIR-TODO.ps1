@@ -2,7 +2,11 @@
 #
 # Sube TODO a GitHub con un solo comando: codigo, galeria y memorias.
 #
-#     & "C:\3D DOCUMENTS\TATTOO\TATTOO_FLASH_CREATOR\SUBIR-TODO.ps1"
+#     powershell -ExecutionPolicy Bypass -File "C:\3D DOCUMENTS\TATTOO\TATTOO_FLASH_CREATOR\SUBIR-TODO.ps1"
+#
+# EL "-ExecutionPolicy Bypass" HACE FALTA. Windows viene de fabrica sin dejar
+# ejecutar scripts, y sin eso sale "la ejecucion de scripts esta deshabilitada
+# en este sistema". No cambia nada del sistema: vale solo para esa vez.
 #
 # No pregunta nada y no borra nada. Si un repositorio no tiene cambios, lo
 # dice y pasa al siguiente.
