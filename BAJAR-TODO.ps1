@@ -100,19 +100,14 @@ if (Test-Path $mem) {
   # la carpeta esta en otro sitio, el nombre es otro y Claude no encontraria
   # nada — tendria la memoria en el disco y aun asi no sabria quien eres.
   #
-  # Como no esta escrito en ninguna parte si el guion bajo se cambia o se
-  # respeta, se dejan las DOS versiones. Son 55 KB: sale mas barato copiar de
-  # mas que adivinar mal.
+  # El guion bajo SE RESPETA: "C:\CLAUDE_TREBALLS" da "C--CLAUDE_TREBALLS".
+  # Solo se cambian los dos puntos, las barras y los espacios.
   $origen = Join-Path $mem "C--3D-DOCUMENTS-TATTOO"
   if (Test-Path $origen) {
-    $claves = @(
-      ($Raiz -replace '[^A-Za-z0-9_]', '-'),
-      ($Raiz -replace '[^A-Za-z0-9]', '-')
-    ) | Select-Object -Unique
-    foreach ($k in $claves) {
-      if ($k -eq "C--3D-DOCUMENTS-TATTOO") { continue }
-      robocopy $origen (Join-Path $claudeProj (Join-Path $k "memory")) /E /R:1 /W:1 /NFL /NDL /NJH /NJS | Out-Null
-      Write-Host "  memorias tambien como: $k"
+    $clave = $Raiz -replace '[^A-Za-z0-9_]', '-'
+    if ($clave -ne "C--3D-DOCUMENTS-TATTOO") {
+      robocopy $origen (Join-Path $claudeProj (Join-Path $clave "memory")) /E /R:1 /W:1 /NFL /NDL /NJH /NJS | Out-Null
+      Write-Host "  memorias tambien como: $clave"
     }
   }
   Write-Host "  memorias de Claude: puestas"
