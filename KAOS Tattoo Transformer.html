@@ -8,7 +8,11 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Anton&family=Bebas+Neue&family=Cinzel:wght@500;700&family=Italianno&family=JetBrains+Mono:wght@400;500;700&family=Permanent+Marker&family=Pirata+One&family=Rye&family=Special+Elite&family=UnifrakturCook:wght@700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="styles.css?v=55" />
+<link rel="stylesheet" href="styles.css?v=65" />
+<!-- Fase 1 de la reestructura: cimientos (dvh, zona segura, dedo, teléfono).
+     Va DESPUÉS de styles.css porque sólo corrige. Quitando esta línea, la
+     interfaz vuelve exactamente a como estaba. -->
+<link rel="stylesheet" href="responsive.css?v=2" />
 </head>
 <body style="background-color: rgb(15, 12, 10)">
 <div class="app">
@@ -667,7 +671,7 @@
       <span class="lbl">TRANSPARENT BACKGROUND</span>
     </label>
 
-    <input type="file" id="fileInput" accept="image/*" multiple />
+    <input type="file" id="fileInput" accept="image/*,.heic,.heif,image/heic,image/heif" multiple />
 
     </div><!-- /side-actions -->
   </aside>
@@ -806,14 +810,18 @@
         <span class="modal-sub" id="gallerySubtitle">—</span>
       </div>
       <div class="modal-actions">
-        <input type="file" id="galleryImportInput" accept="image/*" multiple style="display:none">
+        <input type="file" id="galleryImportInput" accept="image/*,.heic,.heif,image/heic,image/heif" multiple style="display:none">
         <input type="file" id="backupImportInput" accept="application/json,.json" style="display:none">
         <button class="icon-btn" id="addFromGalleryTopBtn" style="display:none">+ A ESTA HOJA</button>
         <button class="icon-btn" id="galleryImportBtn">+ IMPORT</button>
         <button class="icon-btn" id="sessionsBtn" hidden>HOJAS GUARDADAS</button>
         <button class="icon-btn" id="backupExportBtn">↓ BACKUP</button>
         <button class="icon-btn" id="backupImportBtn">↑ RESTAURAR</button>
-        <button class="icon-btn" id="galleryClearBtn">CLEAR ALL</button>
+        <!-- Aqui habia un boton CLEAR ALL que borraba la galeria ENTERA de un
+             toque, con un aviso en ingles. Se lo llevo por delante sin querer.
+             No se sustituye por otro con mejor aviso: no hay ninguna tarea suya
+             que necesite borrarlo todo a la vez, y los disenos no se recuperan.
+             Para quitar uno esta la X de cada tarjeta. -->
         <button class="icon-btn" id="galleryCloseBtn">✕ CLOSE</button>
       </div>
     </div>
@@ -837,6 +845,11 @@
 
     <div class="compose-view" id="composeView" style="display:none">
       <div class="compose-canvas-wrap">
+        <!-- MESAS DE TRABAJO. Una pestana por hoja y un «+» para anadir otra.
+             Antes las hojas se repartian solas al pasar de cinco disenos:
+             montabas una plancha y de pronto tenias dos sin haberlo pedido.
+             Ahora las decide ella, y estan a la vista al lado de la previa. -->
+        <div class="hoja-pestanas" id="hojaPestanas"></div>
         <div class="sheet-toolbar" id="sheetToolbar" style="display:none">
           <button class="icon-btn" id="sheetPrevBtn">‹ PREV</button>
           <span class="sheet-toolbar-label" id="sheetToolbarLabel">Sheet 1/1</span>
@@ -858,8 +871,9 @@
           <div class="gizmo-handle gizmo-corner" data-corner="ne"></div>
           <div class="gizmo-handle gizmo-corner" data-corner="sw"></div>
           <div class="gizmo-handle gizmo-corner" data-corner="se"></div>
-          <div class="gizmo-handle gizmo-rotate" id="gizmoRotate" title="Drag to rotate">⟳</div>
-          <div class="gizmo-handle gizmo-delete" id="gizmoDelete" title="Remove this design from the sheet">✕</div>
+          <div class="gizmo-handle gizmo-rotate" id="gizmoRotate" title="Arrastra para girar">⟳</div>
+          <div class="gizmo-handle gizmo-mirror" id="gizmoMirror" title="Voltear en espejo">⇄</div>
+          <div class="gizmo-handle gizmo-delete" id="gizmoDelete" title="Quitar este diseño de la hoja">✕</div>
         </div>
       </div>
       <aside class="compose-side">
@@ -894,6 +908,13 @@
           <button class="tog" data-layout="scatter">Scatter</button>
           <button class="tog" data-layout="manual" id="manualLayoutBtn">Manual</button>
         </div>
+        <div class="dir-mandos" style="justify-content:flex-start">
+          <label><input type="checkbox" id="composeRejilla" checked> Retícula</label>
+          <span class="dir-pista">Imanta a las guías · Alt se la salta · doble clic en un texto para escribirlo</span>
+        </div>
+        <div class="tip">En <b>Manual</b> no se recoloca nada solo: escalas o giras
+          un diseño y los demás se quedan donde los dejaste. En Tight y Scatter
+          sí se apartan.</div>
         <div class="control">
           <div class="control-row"><label>Bleed</label><span class="val" id="composeBleedVal">2%</span></div>
           <input type="range" id="composeBleed" min="0" max="15" step="1" value="2">
@@ -918,8 +939,13 @@
           <button class="tog" data-bg="papelFoto" aria-selected="true" title="El patron de marca, o tu foto, mezclado con el papel">PAPEL + FOTO</button>
           <button class="tog" data-bg="sticker" title="Tu foto a sangre y los diseños como pegatinas">FOTO / STICKER</button>
         </div>
+        <!-- Fondos de la marca. Antes solo estaba la foto de flash, y sin
+             nombre: era «el fondo que sale si no eliges nada». Ahora se eligen
+             por su nombre, y la lista la pone gallery.js (FONDOS_MARCA) para
+             que anadir uno nuevo aparezca aqui y en el reel a la vez. -->
+        <div class="bg-foto-fila" id="bgMarcaFila"></div>
         <div class="bg-foto-fila">
-          <input type="file" id="bgFotoInput" accept="image/*" style="display:none">
+          <input type="file" id="bgFotoInput" accept="image/*,.heic,.heif,image/heic,image/heif" style="display:none">
           <button class="icon-btn" id="bgFotoBtn">ELEGIR FOTO</button>
           <button class="icon-btn" id="bgFotoGaleriaBtn">DE LA GALERÍA</button>
           <button class="icon-btn" id="bgFotoQuitarBtn" disabled>QUITAR</button>
@@ -1523,14 +1549,33 @@
     <div class="reel-body">
       <div class="reel-previa">
         <canvas id="reelCanvas"></canvas>
+        <div class="dir-mandos">
+          <label><input type="checkbox" id="reelRejilla" checked> Retícula</label>
+          <button type="button" class="icon-btn mini" id="reelResetPos">A SU SITIO</button>
+          <span class="dir-pista">Arrastra · doble clic para escribir · ● gira</span>
+        </div>
       </div>
       <aside class="reel-side">
-        <div class="tip">
-          Los diseños salen como pegatinas recortadas. Primero pasan todos una vez
-          rápido, luego frena para que se vean bien, se para en uno y remata con
-          tu logotipo entero. Caben hasta 50.
+        <!-- LA BIFURCACION. Es lo PRIMERO que se decide, porque de esto depende
+             todo lo demas del panel: en ruleta se eligen disenos sueltos, en
+             flash post se eligen hojas enteras. Antes estaba abajo del todo y
+             habia que bajar hasta el final para descubrir que existia. -->
+        <!-- FORMATO DEL LIENZO. Instagram amplia el video hasta llenar la
+             pantalla: con 9:16 en un movil de hoy eso son 9% comidos por cada
+             lado. El formato alto evita esa ampliacion. -->
+        <div class="seg" id="reelFormato" role="group" aria-label="Formato del vídeo">
+          <button type="button" class="seg-b" data-fmt="9:16">9:16 · INSTAGRAM</button>
+          <button type="button" class="seg-b" data-fmt="alto">ALTO · NO PARA IG</button>
         </div>
+        <div class="tip" id="reelFormatoTip"></div>
 
+        <div class="seg" id="reelModo" role="group" aria-label="Tipo de reel">
+          <button type="button" class="seg-b" data-modo="ruleta">RULETA DE DISEÑOS</button>
+          <button type="button" class="seg-b" data-modo="pases">DESDE FLASH POST</button>
+        </div>
+        <div class="tip" id="reelModoTip"></div>
+
+        <div id="reelRuletaCaja">
         <div class="section-title">Diseños de la ruleta</div>
         <div class="reel-tira" id="reelTira"></div>
         <div class="bg-foto-fila">
@@ -1544,15 +1589,109 @@
         <div class="section-title" style="margin-top:14px">Texto</div>
         <input type="text" id="reelFrase" maxlength="40" placeholder="Frase de arriba">
         <input type="text" id="reelCta" maxlength="40" placeholder="CTA de abajo" style="margin-top:6px">
+        <input type="text" id="reelCierreTxt" maxlength="40" placeholder="Texto del cierre (vacío = nada)" style="margin-top:6px">
+        <div class="tip">El cierre es el logotipo. Este texto sale debajo del arroba,
+          y sólo si escribes algo.</div>
+        </div><!-- /reelRuletaCaja: solo lo que es de la ruleta. Los colores y
+             los textos sueltos valen para los dos modos, asi que quedan fuera. -->
         <div class="control-row" style="margin-top:8px"><label>Color de la frase</label></div>
         <div class="reel-colores" id="reelColFrase"></div>
         <div class="control-row" style="margin-top:6px"><label>Color del marco</label></div>
         <div class="reel-colores" id="reelColMarco"></div>
+        <div class="control-row" style="margin-top:6px">
+          <label for="reelMarcoTam">Tamaño del marco</label>
+          <input type="range" id="reelMarcoTam" min="0.5" max="1.3" step="0.01" value="1">
+          <span class="val" id="reelMarcoTamVal">100%</span>
+        </div>
         <div class="tip" id="reelMarcoAviso" hidden>Marco y frase del mismo color: el marco deja de enmarcar y compite con el titular.</div>
         <div class="control-row" style="margin-top:6px"><label>Color del CTA</label></div>
         <div class="reel-colores" id="reelColCta"></div>
         <div class="control-row" style="margin-top:6px"><label>Color del logo y el @</label></div>
         <div class="reel-colores" id="reelColHandle"></div>
+
+        <div class="control-row" style="margin-top:12px">
+          <label id="reelTxtLabel">Textos sueltos</label>
+          <button type="button" class="icon-btn mini" id="reelTxtAddBtn">+ TEXTO</button>
+        </div>
+        <div id="reelTxtLista" class="reel-txt-lista"></div>
+        <div class="tip">Un precio, una fecha, un «quedan 2». Se arrastran, se giran
+          y se escriben con doble clic en la propia previa. Borrar el texto entero
+          lo quita.</div>
+
+
+
+        <div class="reel-pases" id="reelPasesCaja" hidden>
+          <div class="control-row">
+            <label for="reelPaso">Cada hoja</label>
+            <input type="range" id="reelPaso" min="0.2" max="5" step="0.1" value="2">
+            <span class="val" id="reelPasoVal">2 s</span>
+          </div>
+          <!-- El vaiven. Muy poco a proposito: pasados unos 3 grados deja de
+               leerse como que la hoja respira y parece que el video va mal. -->
+          <div class="control-row">
+            <label for="reelHojaZoom">Tamaño de la hoja</label>
+            <input type="range" id="reelHojaZoom" min="0.6" max="2" step="0.05" value="1">
+            <span class="val" id="reelHojaZoomVal">100%</span>
+          </div>
+          <div class="tip">Por encima del 100% la hoja se sale del area segura de
+            Instagram: se comen los margenes, no los disenos, porque va centrada.</div>
+          <div class="control-row">
+            <label for="reelHojaY">Subir / bajar</label>
+            <input type="range" id="reelHojaY" min="-0.15" max="0.15" step="0.01" value="0.04">
+            <span class="val" id="reelHojaYVal">+4%</span>
+          </div>
+          <div class="control-row">
+            <label for="reelZigzag">Vaivén</label>
+            <input type="range" id="reelZigzag" min="0" max="12" step="0.2" value="1.6">
+            <span class="val" id="reelZigzagVal">1,6°</span>
+          </div>
+          <div class="control-row">
+            <label for="reelZigFrames">Fotogramas del vaivén</label>
+            <input type="range" id="reelZigFrames" min="2" max="8" step="1" value="3">
+            <span class="val" id="reelZigFramesVal">3</span>
+          </div>
+          <div class="tip">En cuántas posiciones distintas se para cada diseño. No es
+            lo mismo que la velocidad: 3 rápidos tiemblan, 8 lentos parecen un giro
+            de verdad.</div>
+          <div class="control-row">
+            <label for="reelZigVel">Velocidad del vaivén</label>
+            <input type="range" id="reelZigVel" min="0.4" max="14" step="0.2" value="4">
+            <span class="val" id="reelZigVelVal">4/s</span>
+          </div>
+          <div class="tip">Cada diseño gira un poquito sobre su propio centro, a un
+            lado y al otro, cada uno a su aire. A 0 se quedan quietos.</div>
+
+          <div class="control-row">
+            <label for="reelVueltas">Veces que se repiten</label>
+            <input type="range" id="reelVueltas" min="1" max="8" step="1" value="1">
+            <span class="val" id="reelVueltasVal">1</span>
+          </div>
+          <div class="tip">Cuántas veces se pasa por todas las hojas antes de la
+            portada y el cierre.</div>
+          <div class="control-row" style="margin-top:10px">
+            <label>Hojas de flash</label>
+            <button type="button" class="icon-btn mini" id="reelHojasBtn">+ HOJA</button>
+          </div>
+          <div id="reelHojasLista" class="reel-txt-lista"></div>
+          <div class="tip" id="reelHojasTip">Las hojas van detrás de los diseños
+            sueltos, en este orden.</div>
+
+          <!-- PORTADA. Va al final porque Instagram deja elegir de caratula
+               cualquier fotograma: asi remata el video Y sirve de portada, sin
+               gastarle los primeros segundos a quien pasa por el feed. -->
+          <div class="control-row" style="margin-top:12px">
+            <label for="reelPortadaOn">Portada al final</label>
+            <input type="checkbox" id="reelPortadaOn">
+            <span class="val" id="reelPortadaDurVal">2,2 s</span>
+          </div>
+          <div class="control-row" id="reelPortadaFila" hidden>
+            <input type="range" id="reelPortadaDur" min="1" max="5" step="0.1" value="2.2">
+            <button type="button" class="icon-btn mini" id="reelPortadaVer">MONTAR PORTADA</button>
+          </div>
+          <div class="tip">Al montarla, la previa se queda en la portada y escribes
+            encima con la misma retícula e imantado: doble clic para escribir,
+            arrastrar para colocar.</div>
+        </div>
 
         <div class="section-title" style="margin-top:14px">Duración</div>
         <div class="reel-total"><span>Dura en total</span><b id="reelDurVal">—</b></div>
@@ -1591,6 +1730,9 @@
           <input type="file" id="reelFondoInput" accept="image/*" multiple style="display:none">
           <button class="icon-btn" id="reelFondoBtn">+ FOTOS DE FONDO</button>
         </div>
+
+        <div class="section-title" style="margin-top:14px">Borrador</div>
+        <div id="reelBorradores"></div>
 
         <div class="bg-foto-fila" style="margin-top:16px">
           <button class="icon-btn" id="reelPlayBtn" disabled>▶ PREVIA</button>
@@ -1652,24 +1794,28 @@
 <script src="guardar.js?v=1"></script>
 <script src="limpiar.js?v=9"></script>
 <script src="processing.js?v=9"></script>
-<script src="gallery.js?v=16"></script>
-<script src="store.js?v=11"></script>
+<script src="gallery.js?v=22"></script>
+<script src="store.js?v=14"></script>
+<script src="borradores-ui.js?v=4"></script>
 <script src="ai.js?v=9"></script>
 <script src="gemini.js?v=9"></script>
 <script src="hf.js?v=9"></script>
 <script src="precio.js?v=1"></script>
 <script src="surreal.js?v=27"></script>
-<script src="app.js?v=38"></script>
-<script src="scan.js?v=14"></script>
+<script src="app.js?v=51"></script>
+<script src="scan.js?v=15"></script>
 <!-- ideas: necesita KAOS_HF, KAOS_PRECIO y KAOS_SURREAL ya cargados -->
 <script src="ideas.js?v=9"></script>
 <script src="ideas-ui.js?v=3"></script>
 <script src="postedit.js?v=2"></script>
 <!-- carrusel: la interfaz necesita KAOS_CARRUSEL y KAOS_GALLERY ya cargados -->
 <script src="carrusel.js?v=9"></script>
-<script src="carrusel-ui.js?v=10"></script>
-<script src="reel.js?v=4"></script>
-<script src="reel-ui.js?v=4"></script>
+<script src="carrusel-ui.js?v=11"></script>
+<!-- la capa de arrastrar/girar/escribir sobre una previa. Antes que reel-ui.js,
+     que la monta al pintar el fotograma quieto. -->
+<script src="lienzo-directo.js?v=4"></script>
+<script src="reel.js?v=22"></script>
+<script src="reel-ui.js?v=21"></script>
 <script src="contornos.js?v=4"></script>
 <script src="mandalas.js?v=15"></script>
 <script src="mandalas-ui.js?v=10"></script>
@@ -1677,5 +1823,14 @@
 <script src="sync.js?v=3"></script>
 <!-- Local-only interaction log. Console: KAOS_USAGE.report() -->
 <script src="usage.js?v=3"></script>
+<!-- Fase 2, segunda version. La primera metia los cuatro paneles en
+     desplegables y ella dijo, con razon, que asi se trabaja mas lento: lo que
+     usa a diario pasaba a estar a un clic en vez de a cero. Esta es plana —
+     todo a la vista, la barra de arriba salta en vez de filtrar, y solo se
+     pliega lo que no ha tocado nunca. panel-plegable.js se queda en la
+     carpeta sin cargarse, por si se reaprovecha lo de decidir por uso real.
+     Va el ULTIMO: necesita que app.js haya montado ya las pestanas. -->
+<script src="panel-lateral.js?v=1"></script>
+
 </body>
 </html>

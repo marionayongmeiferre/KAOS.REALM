@@ -660,10 +660,19 @@ input[type="file"] { display: none; }
   justify-content: space-between;
 }
 /* ---- Reel de ruleta ---- */
-.reel-body { display: flex; gap: 18px; padding: 14px; overflow: auto; }
+/* `align-items: flex-start` es lo que permite que la previa se quede pegada
+   arriba: con el estirado por defecto, la columna de la previa mide lo mismo
+   que la de los mandos y `sticky` no tiene contra qué pegarse. */
+.reel-body { display: flex; gap: 18px; padding: 14px; overflow: auto; align-items: flex-start; }
 .reel-previa {
   flex: 0 0 auto;
-  display: flex; align-items: flex-start; justify-content: center;
+  display: flex; flex-direction: column; align-items: center; justify-content: flex-start;
+  /* Los mandos son mas largos que la previa: al bajar a buscar el boton de
+     grabar, la previa se iba de la pantalla y ella ajustaba a ciegas. Ahora se
+     queda clavada arriba y los mandos pasan por debajo. */
+  position: sticky; top: 0; z-index: 2;
+  background: var(--ink, #0a0908);
+  padding-bottom: 6px;
 }
 /* El canvas es 1080×1920 de verdad; aquí se enseña a la altura del panel. */
 #reelCanvas {
@@ -673,6 +682,61 @@ input[type="file"] { display: none; }
   border: 1px solid rgba(255, 255, 255, 0.14);
   display: block;
 }
+/* ---------------------------------------------- manipulación directa
+   La capa de arrastrar/girar/escribir (lienzo-directo.js) va superpuesta al
+   lienzo de contenido, milímetro a milímetro. Por eso el envoltorio es
+   `inline-block` y no `block`: así se encoge al ancho real del canvas y la capa
+   no se estira de más al 100% de una columna más ancha. */
+.dir-marco { position: relative; display: inline-block; line-height: 0; }
+.dir-capa {
+  position: absolute; inset: 0;
+  width: 100%; height: 100%;
+  /* La rejilla y las cajas se pintan en un lienzo de 1080×1920 igual que el
+     contenido, así que las coordenadas coinciden sin hacer cuentas. */
+  touch-action: none;              /* que arrastrar no haga scroll en el iPad */
+  -webkit-user-select: none; user-select: none;
+  cursor: crosshair;
+}
+.dir-campo {
+  position: absolute;
+  z-index: 3;
+  margin: 0; padding: 4px 6px;
+  font-family: inherit; font-weight: 700; line-height: 1.1;
+  text-align: center; text-transform: uppercase;
+  color: #0a0908;
+  background: var(--lime, #c8ff2e);
+  border: 2px solid #0a0908;
+  border-radius: 3px;
+  resize: none; overflow: hidden;
+}
+.dir-mandos {
+  display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  justify-content: center;
+  padding: 8px 4px 0;
+  font-size: 11px; letter-spacing: 0.04em;
+  color: rgba(255, 255, 255, 0.72);
+}
+.dir-mandos label { display: flex; align-items: center; gap: 5px; cursor: pointer; }
+.dir-pista { opacity: 0.5; font-size: 10px; }
+.icon-btn.mini { padding: 4px 8px; font-size: 10px; }
+
+/* La capa de manipulación directa sobre un lienzo que ya vive dentro de un
+   contenedor posicionado (el flash post centra el suyo con flex y envolverlo
+   le rompía el alto máximo). Aquí la coloca el módulo a mano. */
+.dir-capa-suelta { position: absolute; inset: auto; }
+
+/* Textos sueltos del reel: uno por fila, con su texto, su tamaño y su color. */
+.reel-txt-lista { display: flex; flex-direction: column; gap: 10px; }
+.reel-txt {
+  padding: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-left: 2px solid var(--hot, #c9342a);
+  background: rgba(255, 255, 255, 0.03);
+}
+.reel-txt-cab { display: flex; gap: 6px; align-items: center; }
+.reel-txt-cab input[type="text"] { flex: 1 1 auto; min-width: 0; }
+.reel-txt .control-row { margin-top: 6px; }
+
 .reel-side { flex: 1 1 320px; min-width: 280px; max-width: 420px; }
 .reel-side input[type="text"] {
   width: 100%;
@@ -691,6 +755,12 @@ input[type="file"] { display: none; }
   max-height: 216px; overflow-y: auto;
   padding-right: 2px;
 }
+
+/* Barra de borradores: la misma en todos los editores. */
+.borr-barra { display: grid; grid-template-columns: 1fr auto auto; gap: 6px; align-items: center; }
+.borr-barra .borr-sel { grid-column: 1 / -1; width: 100%; }
+.borr-barra .icon-btn { white-space: nowrap; }
+.borr-nota { grid-column: 1 / -1; margin: 0; min-height: 14px; }
 
 /* La duracion ya no se elige, se calcula. Se enseña grande porque es el dato
    que decide si el reel vale para Instagram o se le va de largo. */
@@ -3038,7 +3108,11 @@ input[type="file"] { display: none; }
 .picker-capa {
   position: fixed;
   inset: 0;
-  z-index: 999;
+  /* Por encima de los cuadros de dialogo (.kaos-dialog-back va a 9000). Estaba
+     en 999, y desde que un dialogo puede abrir este selector —reconectar una
+     hoja— se abria DETRAS: elegias y no pasaba nada a la vista, como si el
+     boton estuviera roto. */
+  z-index: 9200;
   background: rgba(5, 4, 3, 0.95);
   padding: 22px;
   overflow-y: auto;
@@ -4040,4 +4114,470 @@ input[type="file"] { display: none; }
 /* En tableta no hay raton que pasar por encima: los pulgares se quedan puestos. */
 @media (hover: none) {
   .mand-votos { opacity: 1; }
+}
+
+/* ===================================================================
+   TRABAJO GUARDADO — tarjetas con miniatura
+   ===================================================================
+   Antes las hojas y los borradores eran renglones de texto: nombre y
+   fecha. Sus hojas se llaman todas parecido y la fecha no dice qué hay
+   dentro, asi que para encontrar una habia que ir abriendolas por
+   descarte. Aqui manda la imagen y el texto es el pie.
+
+   Marca: rojo sobre negro (estetica de sticker) para el acento de la
+   interfaz. El verde lima NO se usa de adorno — solo marca cual es el
+   borrador que tienes abierto ahora mismo, que es informacion, no
+   decoracion.
+   ------------------------------------------------------------------- */
+
+/* El cuadro de siempre es de 520px: se queda estrecho para una rejilla.
+   Solo se ensancha cuando de verdad lleva tarjetas dentro. */
+.kaos-dialog:has(.kd-cards) { width: min(1040px, 94vw); padding: 26px; }
+
+.kd-title { display: flex; align-items: baseline; gap: 10px; }
+.kd-cuenta {
+  font-family: inherit; font-size: 11px; letter-spacing: 0.14em;
+  color: var(--txt-3); border: 1px solid var(--linea);
+  padding: 2px 7px; transform: translateY(-3px);
+}
+
+.kd-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(148px, 1fr));
+  gap: 14px;
+  margin: 4px 0 18px;
+}
+.kd-vacio {
+  padding: 34px 12px; text-align: center; font-size: 11px;
+  letter-spacing: 0.14em; color: var(--txt-3);
+  border: 1px dashed var(--linea); margin: 4px 0 18px;
+}
+
+.kd-card {
+  position: relative; display: block; width: 100%; padding: 0;
+  text-align: left; cursor: pointer; background: var(--sup-2);
+  border: 1px solid var(--linea);
+  color: inherit; font: inherit;
+  transition: border-color 180ms var(--curva),
+              transform 180ms var(--curva),
+              box-shadow 220ms var(--curva);
+  /* Entran escalonadas. El tope de 12 evita que la tarjeta numero 40
+     aparezca segundo y medio despues de abrir el cuadro. */
+  animation: kd-entra 320ms var(--curva) both;
+  animation-delay: calc(min(var(--i, 0), 12) * 26ms);
+}
+.kd-card:hover, .kd-card:focus-visible {
+  border-color: var(--hot);
+  transform: translateY(-3px);
+  box-shadow: 0 14px 28px -12px rgba(0,0,0,0.85);
+  outline: none;
+}
+.kd-card:active { transform: translateY(-1px); }
+
+/* La que tienes abierta ahora. Lima porque es la firma funcional de la
+   marca: dice "estas aqui", no adorna. */
+.kd-card-actual { border-color: var(--firma); }
+.kd-card-actual::after {
+  content: "ABIERTO";
+  position: absolute; top: 8px; left: 8px;
+  font-size: 8px; letter-spacing: 0.16em;
+  background: var(--firma); color: var(--ink);
+  padding: 3px 6px; pointer-events: none;
+}
+
+.kd-card-foto {
+  display: block; position: relative; overflow: hidden;
+  aspect-ratio: 4 / 5; background: var(--ink);
+  border-bottom: 1px solid var(--linea);
+}
+.kd-card-foto img {
+  width: 100%; height: 100%; object-fit: cover; display: block;
+  transition: transform 420ms var(--curva), filter 260ms var(--curva);
+  /* En reposo un pelin apagada: al pasar por encima despierta. Asi el
+     ojo cae en la que estas mirando y no en las quince a la vez. */
+  filter: saturate(0.82) brightness(0.9);
+}
+.kd-card:hover .kd-card-foto img,
+.kd-card:focus-visible .kd-card-foto img {
+  transform: scale(1.055);
+  filter: saturate(1) brightness(1);
+}
+.kd-card-sinfoto {
+  position: absolute; inset: 0; display: flex;
+  align-items: center; justify-content: center; text-align: center;
+  font-size: 9px; letter-spacing: 0.16em; line-height: 1.7;
+  color: var(--txt-3);
+  background: repeating-linear-gradient(-45deg,
+    transparent 0 7px, rgba(255,255,255,0.028) 7px 14px);
+}
+
+.kd-card-pie { display: block; padding: 9px 10px 11px; }
+.kd-card-name {
+  display: block; font-size: 11px; letter-spacing: 0.06em;
+  color: var(--txt-1); text-transform: uppercase;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.kd-card-meta {
+  display: block; margin-top: 4px;
+  font-size: 9px; letter-spacing: 0.1em; color: var(--txt-3);
+}
+
+/* La ✕ se esconde hasta que te acercas: con veinte tarjetas, veinte
+   aspas encendidas convierten la rejilla en un campo de minas. */
+.kd-card-x {
+  position: absolute; top: 6px; right: 6px;
+  min-width: 26px; height: 26px; padding: 0 7px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 11px; letter-spacing: 0.1em;
+  color: var(--txt-2); background: rgba(10,9,8,0.86);
+  border: 1px solid var(--linea);
+  opacity: 0; transition: opacity 160ms var(--curva),
+                          color 160ms var(--curva),
+                          border-color 160ms var(--curva);
+}
+.kd-card:hover .kd-card-x, .kd-card:focus-within .kd-card-x { opacity: 1; }
+.kd-card-x:hover { color: var(--hot); border-color: var(--hot); }
+.kd-card-x.peligro {
+  opacity: 1; color: var(--bone);
+  background: var(--hot); border-color: var(--hot);
+}
+/* En tactil no hay "pasar por encima": ahi se ve siempre. */
+@media (hover: none) {
+  .kd-card-x { opacity: 1; }
+}
+
+.kd-card-fuera {
+  animation: kd-sale 220ms var(--curva) both;
+  pointer-events: none;
+}
+
+@keyframes kd-entra {
+  from { opacity: 0; transform: translateY(12px) scale(0.985); }
+  to   { opacity: 1; transform: none; }
+}
+@keyframes kd-sale {
+  to { opacity: 0; transform: scale(0.9); }
+}
+
+/* La barra de borradores: el desplegable se fue, queda un boton que
+   dice cuantos hay. */
+.borr-abrir:disabled { opacity: 0.45; cursor: default; }
+
+/* Norma de accesibilidad, no un detalle: quien pide menos movimiento no
+   lo pide de adorno. Se quedan los colores, se va el desplazamiento. */
+@media (prefers-reduced-motion: reduce) {
+  .kd-card, .kd-card-fuera { animation: none; }
+  .kd-card:hover, .kd-card:focus-visible { transform: none; }
+  .kd-card:hover .kd-card-foto img,
+  .kd-card:focus-visible .kd-card-foto img { transform: none; }
+}
+
+/* ===================================================================
+   REEL — modo de montaje, hojas y portada
+   =================================================================== */
+
+/* Titulillo de seccion dentro del panel. No es un <h>: separa sin gritar. */
+.sec-titulo {
+  margin: 18px 0 8px; padding-top: 12px;
+  border-top: 1px solid var(--linea);
+  font-size: 10px; letter-spacing: 0.18em; text-transform: uppercase;
+  color: var(--txt-3);
+}
+
+/* Interruptor de dos posiciones. Un desplegable de dos opciones esconde la
+   mitad de lo que puedes hacer; asi las dos estan a la vista y se ve cual
+   manda. */
+.seg { display: flex; border: 1px solid var(--linea); background: var(--sup-2); }
+.seg-b {
+  flex: 1 1 0; min-width: 0; padding: 9px 6px;
+  background: none; border: 0; cursor: pointer;
+  font: inherit; font-size: 10px; letter-spacing: 0.12em;
+  color: var(--txt-2);
+  transition: color 160ms var(--curva), background 160ms var(--curva);
+}
+.seg-b + .seg-b { border-left: 1px solid var(--linea); }
+.seg-b:hover { color: var(--txt-1); background: var(--sup-3); }
+.seg-b.on {
+  color: var(--bone); background: var(--hot);
+  /* El rojo sobre negro es el acento de la marca. El lima no se toca aqui:
+     es firma, no seleccion. */
+}
+.seg-b:focus-visible { outline: 2px solid var(--hot); outline-offset: -2px; }
+
+.reel-pases {
+  margin-top: 10px; padding: 12px;
+  border: 1px solid var(--linea); border-left: 2px solid var(--hot);
+  background: rgba(255,255,255,0.02);
+  animation: kd-entra 260ms var(--curva) both;
+}
+
+/* Un mando que en este modo no pinta nada. Apagado y sin quitar: quitarlo
+   haria saltar la columna entera cada vez que cambia de modo. */
+.control-row.apagada { opacity: 0.35; }
+.control-row.apagada label { text-decoration: line-through; }
+
+.reel-hoja { display: flex; align-items: center; gap: 9px; }
+.reel-hoja-mini {
+  width: 40px; height: 50px; object-fit: cover; flex: 0 0 auto;
+  border: 1px solid var(--linea); background: var(--ink);
+}
+.reel-hoja-txt {
+  flex: 1 1 auto; min-width: 0;
+  font-size: 11px; letter-spacing: 0.05em; color: var(--txt-1);
+}
+.reel-hoja-txt .tip { margin-top: 3px; }
+
+@media (prefers-reduced-motion: reduce) {
+  .reel-pases { animation: none; }
+}
+
+/* ===================================================================
+   RECONECTAR UNA HOJA
+   ===================================================================
+   La hoja guarda una foto suya, y en esa foto SE VE el diseno que
+   falta, en su sitio. Asi que la foto manda: se marca el hueco en rojo
+   encima y ella reconoce cual era mirando, no leyendo. */
+
+.kaos-dialog:has(.rec-cuerpo) { width: min(880px, 94vw); }
+.rec-cuerpo {
+  display: grid; grid-template-columns: minmax(180px, 300px) 1fr;
+  gap: 18px; align-items: start; margin: 6px 0 18px;
+}
+@media (max-width: 700px) {
+  .rec-cuerpo { grid-template-columns: 1fr; }
+}
+
+.rec-foto {
+  position: relative; border: 1px solid var(--linea);
+  background: var(--ink); line-height: 0;
+}
+.rec-foto img { width: 100%; height: auto; display: block; }
+
+/* El hueco, encima de la foto. Rojo sobre negro: el acento de la marca,
+   y aqui ademas dice "esto es lo que hay que resolver". */
+.rec-marca {
+  position: absolute; cursor: pointer;
+  border: 2px solid var(--hot); background: rgba(201,52,42,0.18);
+  display: flex; align-items: flex-start; justify-content: flex-start;
+  transition: background 160ms var(--curva);
+}
+.rec-marca:hover { background: rgba(201,52,42,0.34); }
+.rec-marca b {
+  font-size: 10px; letter-spacing: 0.06em; line-height: 1;
+  padding: 3px 5px; background: var(--hot); color: var(--bone);
+}
+/* Resuelto: verde lima. Es firma funcional, y aqui la funcion es
+   "este ya esta". No decora. */
+.rec-marca.rec-ok { border-color: var(--firma); background: rgba(200,245,30,0.16); }
+.rec-marca.rec-ok b { background: var(--firma); color: var(--ink); }
+
+.rec-lista { display: flex; flex-direction: column; gap: 8px; }
+.rec-fila {
+  display: flex; align-items: center; gap: 9px;
+  padding: 8px; border: 1px solid var(--linea);
+  border-left: 2px solid var(--hot); background: rgba(255,255,255,0.03);
+}
+.rec-fila:has(.rec-mini img) { border-left-color: var(--firma); }
+.rec-num {
+  flex: 0 0 auto; min-width: 20px; height: 20px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 10px; background: var(--sup-3); color: var(--txt-1);
+}
+.rec-mini {
+  flex: 0 0 auto; width: 38px; height: 46px;
+  border: 1px solid var(--linea); background: var(--ink);
+  display: flex; align-items: center; justify-content: center; overflow: hidden;
+}
+.rec-mini img { width: 100%; height: 100%; object-fit: cover; }
+.rec-vacio { font-size: 15px; color: var(--txt-3); }
+.rec-txt {
+  flex: 1 1 auto; min-width: 0; font-size: 11px; letter-spacing: 0.05em;
+  color: var(--txt-1); overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+
+/* ===================================================================
+   MESAS DE TRABAJO — una pestana por hoja
+   ===================================================================
+   Antes las hojas se repartian solas al pasar de cinco disenos:
+   montabas una plancha y de pronto tenias dos, sin haberlo pedido.
+   Ahora una hoja es una hoja y las demas las anade ella con el «+».
+   Van pegadas a la previa, no en la columna de mandos: son parte del
+   lienzo, como las mesas de trabajo de un editor de imagen. */
+
+.hoja-pestanas {
+  display: flex; flex-wrap: wrap; gap: 6px;
+  margin-bottom: 10px; align-items: center;
+}
+.hoja-tab {
+  position: relative;
+  display: flex; align-items: center; gap: 6px;
+  padding: 6px 9px; cursor: pointer;
+  background: var(--sup-2); border: 1px solid var(--linea);
+  color: var(--txt-2); font: inherit; font-size: 10px; letter-spacing: 0.1em;
+  transition: border-color 160ms var(--curva), color 160ms var(--curva),
+              background 160ms var(--curva);
+}
+.hoja-tab:hover { color: var(--txt-1); background: var(--sup-3); }
+.hoja-tab:focus-visible { outline: 2px solid var(--hot); outline-offset: -2px; }
+/* La hoja en la que estas. Rojo sobre negro: el acento de la marca. */
+.hoja-tab.on {
+  border-color: var(--hot); color: var(--bone);
+  background: rgba(201,52,42,0.16);
+}
+.hoja-tab-n { font-weight: 700; }
+/* Cuantos disenos lleva esa hoja. Se ve sin tener que entrar. */
+.hoja-tab-c {
+  min-width: 16px; padding: 1px 4px; text-align: center;
+  background: var(--sup-3); color: var(--txt-3); font-size: 9px;
+}
+.hoja-tab.on .hoja-tab-c { background: var(--hot); color: var(--bone); }
+.hoja-tab-x {
+  margin-left: 2px; padding: 0 3px; font-size: 10px; color: var(--txt-3);
+  opacity: 0; transition: opacity 160ms var(--curva), color 160ms var(--curva);
+}
+.hoja-tab:hover .hoja-tab-x { opacity: 1; }
+.hoja-tab-x:hover { color: var(--hot); }
+@media (hover: none) { .hoja-tab-x { opacity: 1; } }
+
+.hoja-tab-mas {
+  font-size: 14px; line-height: 1; padding: 5px 11px;
+  border-style: dashed; color: var(--txt-3);
+}
+.hoja-tab-mas:hover { color: var(--hot); border-color: var(--hot); }
+
+/* Espejo, al lado de la X. Mismo tamano y forma que los otros tiradores
+   del gizmo para que se lea como uno mas, no como un anadido. */
+.gizmo-mirror {
+  width: 26px; height: 26px;
+  background: var(--ink-2);
+  color: var(--bone);
+  border: 1px solid var(--bone);
+  border-radius: 50%;
+  transform: translate(-50%, -50%);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 13px; font-weight: 700; line-height: 1;
+  cursor: pointer;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.5);
+}
+.gizmo-mirror:hover { background: var(--hot); border-color: var(--hot); }
+/* Encendido = ese diseno esta volteado ahora mismo. */
+.gizmo-mirror.on { background: var(--hot); border-color: var(--hot); }
+
+/* Un boton que esta ENCENDIDO: el fondo de marca puesto ahora mismo, la
+   portada que estas montando. Rojo sobre negro, el acento de la marca.
+   No habia estado para esto y los botones se quedaban todos iguales,
+   asi que no habia forma de saber cual estaba activo. */
+.icon-btn.on {
+  border-color: var(--hot);
+  background: rgba(201, 52, 42, 0.18);
+  color: var(--bone);
+}
+
+/* Flechas para reordenar hojas. Se esconden como la X: con cinco
+   pestanas, quince simbolos encendidos convierten la barra en ruido. */
+.hoja-tab-mv {
+  padding: 0 2px; font-size: 9px; color: var(--txt-3);
+  opacity: 0; transition: opacity 160ms var(--curva), color 160ms var(--curva);
+}
+.hoja-tab:hover .hoja-tab-mv { opacity: 1; }
+.hoja-tab-mv:hover { color: var(--hot); }
+/* La que no lleva a ningun sitio: se ve, pero apagada. Quitarla haria
+   que las pestanas cambiaran de ancho al moverlas. */
+.hoja-tab-mv.no { opacity: 0.25; pointer-events: none; }
+.hoja-tab:hover .hoja-tab-mv.no { opacity: 0.25; }
+@media (hover: none) { .hoja-tab-mv { opacity: 1; } }
+
+/* ===================================================================
+   CARRUSEL — tarjetas con previa
+   ===================================================================
+   Las plantillas se elegian leyendo su nombre y habia que abrirlas
+   para saber que eran. Ahora cada una enseña su primera slide pintada
+   de verdad. Mismo lenguaje que las hojas guardadas: manda la imagen y
+   el texto es el pie. */
+
+.carr-plantillas, .carr-tarjetas {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 14px;
+}
+.carr-tarj {
+  position: relative; display: block; width: 100%; padding: 0;
+  text-align: left; cursor: pointer; background: var(--sup-2);
+  border: 1px solid var(--linea); color: inherit; font: inherit;
+  transition: border-color 180ms var(--curva), transform 180ms var(--curva),
+              box-shadow 220ms var(--curva);
+  animation: kd-entra 320ms var(--curva) both;
+}
+.carr-tarj:hover, .carr-tarj:focus-visible {
+  border-color: var(--hot); transform: translateY(-3px);
+  box-shadow: 0 14px 28px -12px rgba(0,0,0,0.85); outline: none;
+}
+.carr-tarj-foto {
+  display: block; position: relative; overflow: hidden;
+  background: var(--ink); border-bottom: 1px solid var(--linea);
+  line-height: 0;
+}
+.carr-previa-cv {
+  width: 100%; height: auto; display: block;
+  transition: transform 420ms var(--curva), filter 260ms var(--curva);
+  filter: saturate(0.85) brightness(0.9);
+}
+.carr-tarj:hover .carr-previa-cv,
+.carr-tarj:focus-visible .carr-previa-cv {
+  transform: scale(1.05); filter: none;
+}
+/* Cuantas slides trae. Va sobre la previa, no en el pie: es un dato de
+   la imagen, no de la ficha. */
+.carr-tarj-n {
+  position: absolute; top: 7px; left: 7px;
+  min-width: 18px; padding: 2px 6px; text-align: center;
+  font-size: 9px; letter-spacing: 0.08em;
+  background: rgba(10,9,8,0.82); color: var(--txt-1);
+  border: 1px solid var(--linea); line-height: 1.4;
+}
+.carr-tarj-pie { display: block; padding: 9px 10px 11px; }
+.carr-tarj-t {
+  display: block; font-size: 11px; letter-spacing: 0.06em;
+  color: var(--txt-1); text-transform: uppercase;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.carr-tarj-s {
+  display: block; margin-top: 4px; font-size: 9px;
+  letter-spacing: 0.08em; color: var(--txt-3);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.carr-tarj-x {
+  position: absolute; top: 6px; right: 6px;
+  min-width: 24px; height: 24px; padding: 0 6px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 11px; color: var(--txt-2);
+  background: rgba(10,9,8,0.86); border: 1px solid var(--linea);
+  opacity: 0; transition: opacity 160ms var(--curva), color 160ms var(--curva),
+                          border-color 160ms var(--curva);
+}
+.carr-tarj:hover .carr-tarj-x, .carr-tarj:focus-within .carr-tarj-x { opacity: 1; }
+.carr-tarj-x:hover { color: var(--hot); border-color: var(--hot); }
+@media (hover: none) { .carr-tarj-x { opacity: 1; } }
+
+/* Los cuatro tipos de slide, con previa de como quedaria ESTA slide si
+   se eligiera cada uno. Antes eran cuatro palabras y habia que
+   pulsarlas de una en una para ver la diferencia. */
+.carr-tipo { display: flex; flex-direction: column; align-items: center; gap: 5px; }
+.carr-tipo-cv {
+  width: 100%; max-width: 84px; height: auto; display: block;
+  border: 1px solid var(--linea); background: var(--ink);
+  filter: saturate(0.85) brightness(0.85);
+  transition: filter 200ms var(--curva);
+}
+/* Lima y no rojo: el boton de tipo YA se marca en lima cuando esta
+   elegido (.carr-tipo.sel, mas arriba). Dos colores distintos para
+   decir lo mismo en la misma fila se lee como dos cosas distintas. */
+.carr-tipo.sel .carr-tipo-cv { border-color: var(--firma); filter: none; }
+.carr-tipo:hover .carr-tipo-cv { filter: none; }
+.carr-tipo-et { font-size: 9px; letter-spacing: 0.1em; }
+
+@media (prefers-reduced-motion: reduce) {
+  .carr-tarj { animation: none; }
+  .carr-tarj:hover, .carr-tarj:focus-visible { transform: none; }
+  .carr-tarj:hover .carr-previa-cv { transform: none; }
 }

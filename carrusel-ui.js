@@ -50,22 +50,70 @@
   }
 
   // ------------------------------------------------------------- portada ----
+  // Cómo se dice cuántas slides tiene algo. Una portada no son «1 slides»: es
+  // una portada, y se llama por su nombre.
+  function cuantasSlides(c) {
+    const mm = M.medidas(c);
+    if (c.slides.length === 1) return mm.recorte ? "portada de reel 9:16" : "portada 4:5";
+    return c.slides.length + " slides";
+  }
+
+  // La previa de una slide dentro de una tarjeta. Se lanza DESPUÉS de meter la
+  // tarjeta en la página y sin esperarla: pintar es asíncrono, y esperar cada
+  // una haría que la lista apareciera a trompicones, de una en una.
+  const PREVIA_W = 200;
+  function previa(caja, slide, formato) {
+    const cv = document.createElement("canvas");
+    cv.className = "carr-previa-cv";
+    caja.appendChild(cv);
+    const m = M.medidas({ formato: formato });
+    M.pintarEn(cv, slide, PREVIA_W, Math.round(PREVIA_W * m.H / m.W)).catch(() => {});
+    return cv;
+  }
+  function contador(caja, n) {
+    const e = document.createElement("span");
+    e.className = "carr-tarj-n";
+    e.textContent = n;
+    caja.appendChild(e);
+  }
+
+  // ANTES ESTO ERA UNA LISTA DE NOMBRES.
+  //
+  // Las plantillas se elegían leyendo «CONFIANZA», «PROCESO»…, y había que
+  // abrirlas para saber qué eran. Los carruseles empezados igual: el nombre y
+  // «4 slides». Ahora cada uno enseña su primera slide pintada de verdad, que
+  // es como ella reconoce su trabajo: mirando, no leyendo.
   function pintarInicio() {
     D.plantillas.textContent = "";
     for (const clave of Object.keys(M.PLANTILLAS)) {
       const p = M.PLANTILLAS[clave];
       const b = document.createElement("button");
-      b.className = "carr-plantilla";
+      b.className = "carr-tarj";
       b.id = "carruselNueva_" + clave;          // usage.js registra el id
+      const foto = document.createElement("span");
+      foto.className = "carr-tarj-foto";
+      const pie = document.createElement("span");
+      pie.className = "carr-tarj-pie";
       const t = document.createElement("span");
-      t.className = "carr-plantilla-t";
+      t.className = "carr-tarj-t";
       t.textContent = p.nombre;
       const s = document.createElement("span");
-      s.className = "carr-plantilla-s";
+      s.className = "carr-tarj-s";
       s.textContent = p.pista;
-      b.append(t, s);
+      pie.append(t, s);
+      b.append(foto, pie);
       b.addEventListener("click", () => abrirCarrusel(M.crear(clave)));
       D.plantillas.appendChild(b);
+      // `construir()` y NO `crear()`: crear GUARDA un carrusel nuevo, y pintar
+      // las previas dejaría uno tirado por cada plantilla cada vez que abre
+      // esta pantalla.
+      try {
+        const slides = p.construir();
+        if (slides && slides.length) {
+          previa(foto, slides[0], p.formato || "post");
+          contador(foto, slides.length);
+        }
+      } catch (e) { /* una plantilla rota no debe vaciar la pantalla entera */ }
     }
 
     D.guardados.textContent = "";
@@ -75,28 +123,43 @@
     h.className = "carr-sub";
     h.textContent = "EMPEZADOS";
     D.guardados.appendChild(h);
+    const rej = document.createElement("div");
+    rej.className = "carr-tarjetas";
+    D.guardados.appendChild(rej);
     for (const c of guardados) {
-      const fila = document.createElement("div");
-      fila.className = "carr-guardado";
-      const nom = document.createElement("button");
-      nom.className = "carr-guardado-nom";
-      // Una portada no son "1 slides": es una portada. Se dice por su nombre.
-      const mm = M.medidas(c);
-      nom.textContent = c.titulo + " · " + (c.slides.length === 1
-        ? (mm.recorte ? "portada de reel 9:16" : "portada 4:5")
-        : c.slides.length + " slides");
-      nom.addEventListener("click", () => abrirCarrusel(c));
-      const del = document.createElement("button");
-      del.className = "carr-guardado-del";
+      const b = document.createElement("button");
+      b.className = "carr-tarj";
+      const foto = document.createElement("span");
+      foto.className = "carr-tarj-foto";
+      const pie = document.createElement("span");
+      pie.className = "carr-tarj-pie";
+      const t = document.createElement("span");
+      t.className = "carr-tarj-t";
+      t.textContent = c.titulo;
+      const s = document.createElement("span");
+      s.className = "carr-tarj-s";
+      s.textContent = cuantasSlides(c);
+      pie.append(t, s);
+      const del = document.createElement("span");
+      del.className = "carr-tarj-x";
       del.textContent = "✕";
       del.title = "Borrar este carrusel";
-      del.addEventListener("click", () => {
+      del.setAttribute("aria-label", "Borrar este carrusel");
+      del.addEventListener("click", (e) => {
+        // La ✕ vive DENTRO de la tarjeta, y la tarjeta abre el carrusel: sin
+        // esto el mismo clic borraría y abriría a la vez.
+        e.stopPropagation();
         if (!confirm("¿Borrar «" + c.titulo + "»? No se puede deshacer.")) return;
         M.borrar(c.id);
         pintarInicio();
       });
-      fila.append(nom, del);
-      D.guardados.appendChild(fila);
+      b.append(foto, pie, del);
+      b.addEventListener("click", () => abrirCarrusel(c));
+      rej.appendChild(b);
+      if (c.slides && c.slides.length) {
+        previa(foto, c.slides[0], c.formato || "post");
+        contador(foto, c.slides.length);
+      }
     }
   }
 
@@ -241,9 +304,21 @@
     for (const t of ["portada", "pilar", "foto", "cierre"]) {
       const b = document.createElement("button");
       b.className = "carr-tipo" + (s.tipo === t ? " sel" : "");
-      b.textContent = ETIQUETA[t];
+      const et = document.createElement("span");
+      et.className = "carr-tipo-et";
+      et.textContent = ETIQUETA[t];
+      b.appendChild(et);
       b.addEventListener("click", () => { s.tipo = t; pintarCampos(); refrescar(); });
       tipoFila.appendChild(b);
+      // Cada tipo enseña CÓMO QUEDARÍA esta misma slide si lo eligiera: mismos
+      // textos, otra plantilla. Antes eran cuatro palabras y había que
+      // pulsarlas una a una para ver la diferencia.
+      const cv = document.createElement("canvas");
+      cv.className = "carr-tipo-cv";
+      b.insertBefore(cv, et);
+      const m = M.medidas(actual);
+      const comoSeria = Object.assign({}, s, { tipo: t });
+      M.pintarEn(cv, comoSeria, 84, Math.round(84 * m.H / m.W)).catch(() => {});
     }
     D.campos.appendChild(tipoFila);
 

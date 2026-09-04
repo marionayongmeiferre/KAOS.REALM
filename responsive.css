@@ -1,0 +1,349 @@
+/* KAOS.REALM — cimientos de la interfaz (fase 1)
+   ==================================================================
+   Va DESPUÉS de styles.css y sólo corrige. No sustituye nada: si esto se
+   quita del HTML, la app vuelve exactamente a como estaba. Esa es la razón
+   de que sea un fichero aparte y no 300 ediciones repartidas por las 4.096
+   líneas de styles.css — una reestructura por fases tiene que poder deshacerse
+   por fases.
+
+   Qué arregla, y por qué (medido, no supuesto):
+
+   1. `height: 100vh` en .app. En iOS `vh` cuenta la pantalla CON la barra de
+      Safari escondida, así que el final de la app queda siempre debajo de la
+      barra. Se pasa a `dvh`, que sí encoge y crece con ella. En el CSS había
+      1 uso de vh y 0 de dvh.
+   2. Cero `safe-area-inset` en todo el CSS: nada esquivaba el notch ni la
+      barra de gestos del iPhone.
+   3. 11 reglas de campo de texto por debajo de 16px (más el cuerpo, a 13px).
+      Safari en iPhone hace zoom solo al tocar un campo de menos de 16px y
+      luego deja la página descuadrada. Con dedo, 16px mínimo.
+   4. 37 reglas de control por debajo del mínimo táctil de 44px. Había un
+      parche, pero sólo por debajo de 1280px de ancho: un iPad Pro apaisado
+      mide 1366 y se quedaba fuera.
+   5. Móvil: no había diseño de móvil. La barra lateral se llevaba el 82% de
+      un iPhone de 390px. Ahora el lienzo se queda arriba, siempre a la vista,
+      y los mandos ocupan el resto con las pestañas fijas.
+
+   Los tamaños de letra y los espacios salen de una escala, no de valores
+   sueltos. Antes había 14 puntos de ruptura distintos (700, 720, 760, 820,
+   900, 1280…) puestos según hacía falta; aquí sólo hay tres, y significan
+   algo: teléfono, tableta, escritorio.
+   ================================================================== */
+
+:root {
+  /* --- espacio: escala de 4, la de Material. Nada fuera de esta lista --- */
+  --e1: 4px;
+  --e2: 8px;
+  --e3: 12px;
+  --e4: 16px;
+  --e5: 24px;
+  --e6: 32px;
+  --e7: 48px;
+
+  /* --- letra --- */
+  --t-mini: 10px;   /* pies, sellos. Nunca para algo que haya que leer entero */
+  --t-peq: 12px;
+  --t-base: 13px;
+  --t-campo: 16px;  /* MÍNIMO en cualquier campo de texto con dedo: ver punto 3 */
+  --t-titulo: 18px;
+
+  /* --- dedo --- */
+  --toque: 44px;    /* Apple HIG. Material pide 48; 44 es el suelo */
+  --toque-hueco: 8px;
+
+  /* --- capas. Antes los z-index iban sueltos de 2 a 200 sin criterio --- */
+  --z-lienzo: 1;
+  --z-flotante: 10;
+  --z-barra: 40;
+  --z-modal: 200;
+  --z-aviso: 400;
+}
+
+/* ------------------------------------------------------------------ alto
+   `dvh` es la altura visible de verdad. Se deja `vh` justo antes como red
+   de seguridad para un navegador viejo que no lo entienda: si no lo entiende
+   se salta la línea y se queda con la anterior. */
+html, body { height: 100vh; height: 100dvh; }
+.app { height: 100vh; height: 100dvh; }
+
+/* --------------------------------------------------------- zona segura
+   El notch, la isla dinámica y la barra de gestos. Sin esto, en un iPhone
+   la primera fila de botones queda debajo del reloj y la última debajo de
+   la raya de abajo. */
+.app {
+  padding-left: env(safe-area-inset-left);
+  padding-right: env(safe-area-inset-right);
+}
+.side { padding-bottom: calc(14px + env(safe-area-inset-bottom)); }
+.toolbar { top: calc(14px + env(safe-area-inset-top)); }
+
+/* ------------------------------------------------------------ con dedo
+   Se aplica a CUALQUIER tamaño de pantalla, no sólo a las pequeñas: un iPad
+   Pro apaisado mide 1366px y también se toca con el dedo. Eso es lo que se
+   escapaba del parche anterior, que cortaba en 1280. */
+@media (pointer: coarse) {
+  /* El zoom automático de Safari al enfocar un campo. Es la causa de que la
+     pantalla se quede torcida después de escribir. */
+  input, textarea, select,
+  .text-input, .cm-input, .fal-key-input,
+  .reel-side input[type="text"],
+  .ai-elem-row input,
+  .idea-campo input, .idea-campo select,
+  .ideas-addrow input[type="text"],
+  .refs-search input,
+  .surreal-layer input {
+    font-size: var(--t-campo);
+  }
+  input[type="text"], input[type="number"], input[type="search"],
+  input[type="email"], textarea, select {
+    min-height: var(--toque);
+  }
+
+  /* Tocar sin esperar. Sin `manipulation` el navegador espera ~300ms por si
+     era un doble toque para hacer zoom, y todo va como con retraso. */
+  button, .tog, .icon-btn, .btn, .lz, .side-tab, .pick-btn, .style-btn,
+  label, input, select, textarea, .chip, [role="button"] {
+    touch-action: manipulation;
+  }
+
+  button, .tog, .icon-btn, .btn, .lz, .side-tab, .style-btn, .pick-btn {
+    min-height: var(--toque);
+  }
+  /* Los pequeños de verdad (una ✕, una miniatura) no se pueden estirar sin
+     descuadrar la fila. Se les crece la zona de toque por fuera, que es lo
+     que dice la guía de Apple: el dibujo puede ser pequeño, la diana no. */
+  .icon-btn.mini, .gallery-card .del, .gallery-card .move, .item-row .icon-btn.flex {
+    position: relative;
+  }
+  .icon-btn.mini::after, .gallery-card .del::after, .gallery-card .move::after,
+  .item-row .icon-btn.flex::after {
+    content: "";
+    position: absolute;
+    top: 50%; left: 50%;
+    width: var(--toque); height: var(--toque);
+    transform: translate(-50%, -50%);
+  }
+
+  /* Deslizadores: el agarre a 26px y la barra alta, para poder cogerla sin
+     mirar. Estaba sólo por debajo de 1280px. */
+  .control input[type="range"] { height: 34px; }
+  .control input[type="range"]::-webkit-slider-thumb { width: 26px; height: 26px; }
+  .control input[type="range"]::-moz-range-thumb { width: 26px; height: 26px; }
+
+}
+
+/* ================================================================ TELÉFONO
+   Hasta 600px. Ella pidió el editor entero aquí, no una versión recortada,
+   así que el reparto es: el lienzo arriba, compacto pero SIEMPRE a la vista
+   —si desaparece al bajar a por un mando, se ajusta a ciegas—, y todos los
+   mandos debajo con sitio de sobra para desplazarse.
+   ================================================================ */
+@media (max-width: 600px) {
+  .app {
+    grid-template-columns: 1fr;
+    /* El lienzo no baja de 200px ni pasa de 40% de la pantalla. Por debajo
+       de 200 no se ve lo que se está haciendo; por encima de 40% no quedan
+       mandos a la vista y hay que desplazarse por todo. */
+    grid-template-rows: minmax(200px, 40dvh) minmax(0, 1fr);
+  }
+  .stage { order: 1; min-height: 0; }
+  .side {
+    order: 2;
+    max-height: none;          /* mandaba un tope de 46vh; aquí manda la rejilla */
+    border-right: none;
+    border-top: 1px solid var(--linea);
+    padding: var(--e3) var(--e3) calc(var(--e3) + env(safe-area-inset-bottom));
+  }
+
+  /* Las pestañas se quedan pegadas arriba del panel. Con el editor completo
+     en una pantalla de 390px la lista de mandos es larguísima, y sin esto
+     hay que subir hasta el principio cada vez que se quiere cambiar de
+     grupo. Es el mismo motivo por el que la previa del reel es pegajosa. */
+  .side-tabs {
+    position: sticky;
+    top: 0;
+    z-index: var(--z-barra);
+    background: var(--ink);
+    margin: 0 0 var(--e2);
+    padding-block: var(--e1);
+  }
+
+  /* La marca no cabe y no hace nada: ya sabe de quién es la app. */
+  .side .brand-logo-wrap, .side .brand, .side .brand-sub, .side .foot { display: none; }
+
+  /* Los lanzadores en dos columnas en vez de una fila que se sale. */
+  .lanzador { display: grid; grid-template-columns: repeat(2, 1fr); gap: var(--e2); }
+  .lanzador .lz { width: auto; }
+
+  /* La barra flotante del lienzo, a lo ancho y sin pisar el notch. */
+  .toolbar { left: var(--e2); right: var(--e2); gap: var(--e2); flex-wrap: wrap; }
+
+  /* Los modales, a pantalla completa: 24px de margen por lado en 390px se
+     comían el 12% del ancho para no enseñar nada. */
+  .modal-inner {
+    margin: 0;
+    border: none;
+    padding-top: env(safe-area-inset-top);
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+
+  /* Nada puede desbordar a lo ancho. Es el fallo que más ensucia una app en
+     el móvil: una tabla o un lienzo ancho y toda la página se va de lado. */
+  body { overflow-x: hidden; }
+  .modal-inner, .side, .stage { max-width: 100vw; }
+
+  /* El panel del reel deja de ser dos columnas. */
+  .reel-body { flex-direction: column; align-items: stretch; }
+  .reel-previa { position: static; }   /* pegajosa no tiene sentido en columna */
+  #reelCanvas { height: auto; width: 100%; max-height: 52dvh; }
+  .reel-side { max-width: none; min-width: 0; }
+}
+
+/* ================================================================= TABLETA
+   601–1024px. El iPad en vertical mide 768 o 834: cabe una columna de mandos
+   de verdad al lado del lienzo, sólo que más estrecha que en el escritorio.
+   ================================================================= */
+@media (min-width: 601px) and (max-width: 1024px) {
+  .app { grid-template-columns: minmax(280px, 34%) 1fr; }
+  .side { padding: var(--e4) var(--e3) calc(var(--e3) + env(safe-area-inset-bottom)); }
+  .side .brand-sub { display: none; }
+  .modal-inner { margin: var(--e3); }
+}
+
+/* iPad apaisado y pantallas cortas: la marca se va antes que los mandos.
+   Lo que tiene que sobrevivir a una pantalla baja son los controles. */
+@media (max-height: 700px) {
+  .side .brand-logo-wrap, .side .brand, .side .brand-sub { display: none; }
+}
+
+/* --------------------------------------------------------- desplazamiento
+   `contain` corta el rebote encadenado: sin esto, al llegar al final de la
+   lista de mandos el gesto sigue y arrastra la página entera por debajo.
+   (`-webkit-overflow-scrolling` ya no hace falta: Safari lo da por hecho
+   desde iOS 13, y el editor lo marca como obsoleto.) */
+.side-scroll, .side, .modal-inner, .reel-tira, .gallery-grid {
+  overscroll-behavior: contain;
+}
+
+/* ================================ FASE 2 — el panel, plano y con carácter
+   Sin desplegables. Todo lo que usa, a cero clics: la primera versión metía
+   cada zona en un acordeón y era un clic antes de cada acción. Lo único que
+   se pliega es lo que tiene CERO pulsaciones suyas en 10 días.
+   Lo monta panel-lateral.js, que pone la clase `zn-on`; si ese script falla,
+   nada de esto se aplica y vuelven las pestañas.
+
+   El aspecto sale de su brand book, no de un tema genérico:
+     · Verde lima = su FIRMA, funcional y fija (marca de agua, texto en
+       vídeo). Usarlo de acento en botones le quitaría el significado, así
+       que aquí NO aparece.
+     · Magenta = fotos de tatuaje reales. "Satura la sensación de lujo y lo
+       vuelve barato" si se reparte por todo. Tampoco aparece.
+     · Rojo sobre negro = su estética de sticker. ESE es el acento de la
+       interfaz, y ya existía en la app como `--hot`.
+     · Helvetica Neue Bold Extended, mayúsculas y condensada, que es su
+       tipografía de marca y ya está cargada en la página.
+   ==================================================================== */
+
+.zn-on .side-scroll { padding-right: var(--e2); }
+
+.zn { padding: 0 0 var(--e6); }
+
+/* El rótulo de zona: número + nombre, como una plancha de flash numerada.
+   No es un botón, no se pliega: es un letrero. Se queda pegado arriba al
+   desplazarse para no perder nunca de vista en qué zona se está. */
+.zn-rotulo {
+  position: sticky;
+  top: 0;
+  z-index: var(--z-flotante);
+  display: flex;
+  align-items: baseline;
+  gap: var(--e3);
+  padding: var(--e4) 0 var(--e2);
+  margin-bottom: var(--e3);
+  background: linear-gradient(180deg, var(--ink) 62%, rgba(10, 9, 8, 0));
+  border-bottom: 1px solid var(--linea);
+}
+.zn-num {
+  font-family: "Helvetica Neue LT Std 73 BEx", Impact, sans-serif;
+  font-size: var(--t-titulo);
+  line-height: 1;
+  color: var(--hot);
+  letter-spacing: 0.02em;
+}
+.zn-nom {
+  font-family: "Helvetica Neue LT Std 73 BEx", Impact, sans-serif;
+  font-size: var(--t-peq);
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--bone);
+}
+
+/* Los rótulos de dentro bajan de rango: la jerarquía la hacen el tamaño y el
+   espacio, no una caja alrededor de cada cosa. */
+.zn .section-title {
+  font-size: var(--t-mini);
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--mute);
+  margin: var(--e5) 0 var(--e2);
+  padding: 0;
+  border: none;
+}
+.zn > .section-title:first-of-type { margin-top: 0; }
+
+/* Lo que no ha tocado nunca. Es el único pliegue, y por definición no
+   esconde nada que use. Discreto: no compite con los mandos de verdad. */
+.zn-avanzado { margin-top: var(--e5); border-top: 1px dashed var(--linea); }
+.zn-avanzado > summary {
+  cursor: pointer;
+  list-style: none;
+  padding: var(--e3) 0;
+  min-height: var(--toque);
+  display: flex;
+  align-items: center;
+  gap: var(--e2);
+  font-size: var(--t-mini);
+  letter-spacing: 0.14em;
+  color: var(--mute);
+}
+.zn-avanzado > summary::-webkit-details-marker { display: none; }
+.zn-avanzado > summary::before {
+  content: "+";
+  color: var(--hot);
+  font-size: var(--t-peq);
+}
+.zn-avanzado[open] > summary::before { content: "–"; }
+.zn-avanzado > summary:hover { color: var(--bone); }
+
+/* La barra de arriba ya no filtra: salta. Se queda fija y marca en qué zona
+   estás según lo que se ve, no según lo último que pulsaste. */
+.zn-on .zn-nav {
+  position: sticky;
+  top: 0;
+  z-index: var(--z-barra);
+  background: var(--ink);
+}
+.zn-on .zn-nav .side-tab[aria-selected="true"] {
+  color: var(--hot);
+  border-color: currentColor;
+}
+
+/* --------------------------------------------------------------- foco
+   Se ve el foco del teclado. Es requisito de accesibilidad y además hace
+   falta para poder usar la app con un teclado conectado al iPad. */
+:focus-visible {
+  outline: 2px solid var(--hot, #c9342a);
+  outline-offset: 2px;
+}
+
+/* ------------------------------------------------------- menos movimiento
+   Si tiene activado "reducir movimiento" en el sistema, se le hace caso en
+   todo, no sólo en las animaciones que se acordaron de mirarlo. */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}

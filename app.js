@@ -379,8 +379,34 @@
   // desaparecía. Ahora sólo va derecha al estilo la primera de todas; en cuanto
   // ya hay algo en el lienzo, la nueva entra en el collage y las dos se pueden
   // mover y editar a la vez desde STYLE.
+  // Un HEIC de iPhone no lo decodifica ni Chrome ni Edge (Safari sí). Antes,
+  // soltarlo aquí no hacía NADA: ni cargaba, ni avisaba, ni dejaba rastro.
+  // Y sus fotos son HEIC.
+  //
+  // El conversor ya existía dentro de scan.js (lo usa el escáner de libreta);
+  // ahora está abierto y se usa también aquí, en vez de escribir otro. Si el
+  // fichero no es HEIC pasa de largo sin tocarlo.
+  async function normalizarFotos(fs) {
+    const SC = window.KAOS_SCAN;
+    if (!SC || typeof SC.normalizar !== "function") return fs;
+    const out = [];
+    for (const f of fs) {
+      try { out.push(await SC.normalizar(f)); }
+      catch (e) {
+        // Se cuenta y se sigue con las demás: que una foto rara no tire abajo
+        // las otras cinco que sí valían.
+        console.warn("HEIC:", e);
+        showToast((f && f.name ? f.name + ": " : "") +
+          (e && e.message ? e.message : "no he podido abrir esa foto"), 8000);
+      }
+    }
+    return out;
+  }
+
   async function recibirFotos(lista) {
-    const fs = Array.prototype.slice.call(lista || []);
+    let fs = Array.prototype.slice.call(lista || []);
+    if (!fs.length) return;
+    fs = await normalizarFotos(fs);
     if (!fs.length) return;
     if (!window.KAOS_SURREAL) { loadFile(fs[0]); return; }
     const enCollage = KAOS_SURREAL.hayElementos();
@@ -2054,7 +2080,6 @@
   const selStatus = $("#selStatus");
   const backToGalleryBtn = $("#backToGalleryBtn");
   const galleryCloseBtn = $("#galleryCloseBtn");
-  const galleryClearBtn = $("#galleryClearBtn");
   const galleryImportBtn = $("#galleryImportBtn");
   const galleryImportInput = $("#galleryImportInput");
   const composeCanvas = $("#composeCanvas");
@@ -2099,6 +2124,9 @@
     cornerColor: "black",
     logoColor: "gray",
     stickerWithFrame: false,
+    // Se ve la retícula de composición. Imantar imanta siempre (Alt se lo
+    // salta); esto es sólo si se dibuja o no, igual que en el reel.
+    rejilla: true,
     pagePlacements: {},
     title: "DISEÑOS DISPONIBLES",
     handle: "DISEÑOS DISPONIBLES",
@@ -2131,16 +2159,11 @@
   // ----- gallery open/close/import/clear -----
   galleryBtn.addEventListener("click", openGallery);
   galleryCloseBtn.addEventListener("click", () => askSaveSheet(closeGallery));
-  galleryClearBtn.addEventListener("click", () => {
-    if (!confirm("Clear all gallery items?")) return;
-    KAOS_GALLERY.clear();
-    composeState.selectedIds = [];
-    refreshGalleryCount();
-    renderGalleryGrid();
-  });
   galleryImportBtn.addEventListener("click", () => galleryImportInput.click());
   galleryImportInput.addEventListener("change", async (e) => {
-    const files = Array.from(e.target.files || []);
+    // Igual que al soltar en el lienzo: un HEIC hay que pasarlo a JPEG antes,
+    // o el navegador no lo abre y el diseno no llega nunca a la galeria.
+    const files = await normalizarFotos(Array.from(e.target.files || []));
     const added = [];
     for (const f of files) { const it = await importFile(f); if (it) added.push(it); }
     e.target.value = "";
@@ -2287,27 +2310,39 @@
 
   async function openProjectsDialog() {
     const list = await KAOS_STORE.listProjects();
-    const rows = list.length ? list.map(p => `
-      <div class="kd-row" data-id="${p.id}">
-        <img class="kd-thumb" src="${p.thumb || ""}" alt="">
-        <div class="kd-row-main">
-          <div class="kd-row-name">${escapeAttr(p.name)}</div>
-          <div class="kd-row-meta">${new Date(p.ts).toLocaleString()}</div>
-        </div>
-        <button class="icon-btn" data-act="open">ABRIR</button>
-        <button class="icon-btn" data-act="del">✕</button>
-      </div>`).join("") : '<div class="kd-body">Todavía no has guardado ningún diseño. Pulsa ◉ GUARDAR con un diseño abierto.</div>';
+    // La misma rejilla que las hojas y los borradores. Aquí la miniatura ya se
+    // guardaba desde siempre, pero salía a 52 px en un renglón de texto: se
+    // sabía que había una foto, no QUÉ foto. Ahora manda el dibujo.
+    const rows = list.length ? list.map((p, i) => `
+      <button class="kd-card" data-id="${p.id}" data-act="open" style="--i:${i}">
+        <span class="kd-card-foto">${p.thumb
+          ? `<img src="${p.thumb}" alt="" loading="lazy">`
+          : `<div class="kd-card-sinfoto">SIN<br>MINIATURA</div>`}</span>
+        <span class="kd-card-pie">
+          <span class="kd-card-name">${escapeAttr(p.name)}</span>
+          <span class="kd-card-meta">${new Date(p.ts).toLocaleString()}</span>
+        </span>
+        <span class="kd-card-x" data-act="del" title="Borrar" aria-label="Borrar">✕</span>
+      </button>`).join("") : '<div class="kd-vacio">Todavía no has guardado ningún diseño. Pulsa ◉ GUARDAR con un diseño abierto.</div>';
     const back = dialog(`
-      <div class="kd-title">Mis diseños guardados</div>
-      <div class="kd-list">${rows}</div>
+      <div class="kd-title">Mis diseños guardados <span class="kd-cuenta">${list.length}</span></div>
+      <div class="kd-cards">${rows}</div>
       <div class="kd-actions"><button class="icon-btn" data-act="close">CERRAR</button></div>`);
     back.addEventListener("click", async (e) => {
-      const act = e.target.dataset && e.target.dataset.act;
+      // El objetivo del clic puede ser la <img> o un <span> de dentro de la
+      // tarjeta, que no llevan `data-act`. Se sube hasta el primero que lo
+      // tenga: la ✕ está más adentro que la tarjeta, así que gana ella y
+      // borrar sigue siendo borrar.
+      const quien = e.target.closest && e.target.closest("[data-act]");
+      const act = quien && quien.dataset.act;
       if (!act) return;
       if (act === "close") { back.remove(); return; }
-      const row = e.target.closest(".kd-row");
+      const row = e.target.closest(".kd-card");
       if (!row) return;
       if (act === "del") {
+        // La ✕ va dentro de la tarjeta, y la tarjeta abre el diseño: sin esto
+        // el mismo clic borraría y abriría a la vez.
+        e.stopPropagation();
         await KAOS_STORE.deleteProject(row.dataset.id);
         if (currentProjectId === row.dataset.id) { currentProjectId = null; currentProjectName = ""; }
         back.remove(); openProjectsDialog(); return;
@@ -2390,6 +2425,15 @@
       if (typeof v === "function" || (v && v.nodeType)) continue;
       try { JSON.stringify(v); o[k] = v; } catch (e) {}
     }
+    // La hoja se guarda con la HUELLA de cada diseño además de su id. El id se
+    // pierde en cuanto borras el diseño de la galería y lo vuelves a subir: el
+    // archivo es el mismo pero el id es otro, y la hoja se quedaba coja sin
+    // explicación. La huella describe el dibujo, así que sobrevive a eso.
+    o.huellas = {};
+    for (const gid of (o.selectedIds || [])) {
+      const it = KAOS_GALLERY.load().find((x) => x.id === gid);
+      if (it && it.huella) o.huellas[gid] = it.huella;
+    }
     return JSON.parse(JSON.stringify(o));
   }
   function dialog(html) {
@@ -2399,6 +2443,32 @@
     document.body.appendChild(back);
     return back;
   }
+  // Una foto pequeña de lo que hay en el lienzo, para la tarjeta de la hoja
+  // guardada. Antes la lista era nombre + fecha + «7 diseños», y con diez hojas
+  // que se llaman todas «Hoja 3/9/26» eso no dice nada: hay que abrirlas una a
+  // una para saber cuál es cuál. Con la miniatura se reconoce de un vistazo.
+  //
+  // 360 px de lado mayor y JPEG al 72%: unos 20 KB por hoja. En localStorage
+  // eso habría sido una barbaridad; en IndexedDB no se nota.
+  function miniatura(canvas, lado) {
+    if (!canvas || !canvas.width || !canvas.height) return null;
+    try {
+      const max = lado || 360;
+      const k = Math.min(1, max / Math.max(canvas.width, canvas.height));
+      const c = document.createElement("canvas");
+      c.width = Math.max(1, Math.round(canvas.width * k));
+      c.height = Math.max(1, Math.round(canvas.height * k));
+      const x = c.getContext("2d");
+      // Fondo debajo: la hoja puede tener transparencia, y un JPEG sin fondo la
+      // pinta en negro sucio o en blanco según el navegador.
+      x.fillStyle = "#0a0908";
+      x.fillRect(0, 0, c.width, c.height);
+      x.imageSmoothingQuality = "high";
+      x.drawImage(canvas, 0, 0, c.width, c.height);
+      return c.toDataURL("image/jpeg", 0.72);
+    } catch (e) { return null; }
+  }
+
   function askSaveSheet(next) {
     if (!composeDirty || !composeView || composeView.style.display === "none") { next(); return; }
     const def = currentSessionName || ("Hoja " + new Date().toLocaleDateString() + " " +
@@ -2419,7 +2489,12 @@
       if (!act) return;
       if (act === "cancel") { back.remove(); return; }
       if (act === "save") {
-        const s = KAOS_STORE.saveSession(input.value.trim() || def, sheetSessionData(), currentSessionId);
+        // Dos tamaños: el chico para la tarjeta de la lista, el grande para
+        // poder meter esta hoja como página de un reel sin que se vea borrosa.
+        const s = KAOS_STORE.saveSession(input.value.trim() || def, sheetSessionData(),
+                                         currentSessionId,
+                                         miniatura(composeCanvas),
+                                         miniatura(composeCanvas, 1080));
         currentSessionId = s.id; currentSessionName = s.name;
         showToast("Hoja guardada · " + s.name);
       }
@@ -2472,33 +2547,76 @@
   // solo para llegar hasta aqui.
   const sheetsTopBtn = $("#sheetsTopBtn");
   if (sheetsTopBtn) sheetsTopBtn.addEventListener("click", openSessionsDialog);
+  // El nombre lo escribe ella y va dentro de una plantilla HTML: unas comillas
+  // o un `<` partirían el marcado y la tarjeta saldría rota.
+  function esc(s) {
+    return String(s == null ? "" : s).replace(/[&<>"']/g, (c) => (
+      { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]
+    ));
+  }
+  function cuandoCorto(ts) {
+    const d = new Date(ts), hoy = new Date();
+    const hora = d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+    if (d.toDateString() === hoy.toDateString()) return "hoy · " + hora;
+    const ayer = new Date(hoy); ayer.setDate(hoy.getDate() - 1);
+    if (d.toDateString() === ayer.toDateString()) return "ayer · " + hora;
+    return d.toLocaleDateString([], { day: "2-digit", month: "short" }) + " · " + hora;
+  }
+
+  // La lista de hojas era nombre + fecha en renglones de texto. Con diez hojas
+  // llamadas todas «Hoja 3/9/26» había que abrirlas de una en una para saber
+  // cuál era cuál. Ahora es una rejilla de tarjetas con la foto de la hoja: se
+  // reconoce mirando, que es como ella reconoce su trabajo.
   function openSessionsDialog() {
     const list = KAOS_STORE.sessions();
-    const rows = list.length ? list.map(s => `
-      <div class="kd-row" data-id="${s.id}">
-        <div class="kd-row-main">
-          <div class="kd-row-name">${s.name}</div>
-          <div class="kd-row-meta">${new Date(s.ts).toLocaleString()} · ${(s.data && s.data.selectedIds ? s.data.selectedIds.length : 0)} diseños</div>
-        </div>
-        <button class="icon-btn" data-act="open">ABRIR</button>
-        <button class="icon-btn" data-act="del">✕</button>
-      </div>`).join("") : '<div class="kd-body">Aún no has guardado ninguna hoja.</div>';
+    const rows = list.length ? list.map((s, i) => {
+      const n = (s.data && s.data.selectedIds ? s.data.selectedIds.length : 0);
+      const foto = s.thumb
+        ? `<img src="${s.thumb}" alt="" loading="lazy">`
+        // Una hoja guardada antes de que existieran las miniaturas. Se dice, en
+        // vez de dejar un hueco gris que parezca que se ha roto.
+        : `<div class="kd-card-sinfoto">SIN<br>MINIATURA</div>`;
+      return `
+      <button class="kd-card" data-id="${s.id}" data-act="open" style="--i:${i}">
+        <span class="kd-card-foto">${foto}</span>
+        <span class="kd-card-pie">
+          <span class="kd-card-name">${esc(s.name)}</span>
+          <span class="kd-card-meta">${cuandoCorto(s.ts)} · ${n} ${n === 1 ? "diseño" : "diseños"}</span>
+        </span>
+        <span class="kd-card-x" data-act="del" title="Borrar" aria-label="Borrar">✕</span>
+      </button>`;
+    }).join("") : '<div class="kd-vacio">Aún no has guardado ninguna hoja.</div>';
     const kb = pesoHojasKB();
     const back = dialog(`
-      <div class="kd-title">Hojas guardadas</div>
-      <div class="kd-list">${rows}</div>
-      <div class="kd-body">Ocupan ${kb} KB. El navegador da unos 5000 KB para todo (galería incluida).</div>
+      <div class="kd-title">Hojas guardadas <span class="kd-cuenta">${list.length}</span></div>
+      <div class="kd-cards">${rows}</div>
+      <div class="kd-body">Ocupan ${kb} KB. Ya no van en el cajón de 5 MB del navegador,
+        así que no hay tope de diez: caben cientos.</div>
       <div class="kd-actions">
         <button class="icon-btn" data-act="compactar">ALIGERAR FOTOS DE FONDO</button>
         <button class="icon-btn" data-act="close">CERRAR</button>
       </div>`);
+    // IndexedDB puede tardar un pestañeo en abrir. Si termina con el diálogo ya
+    // en pantalla y trae hojas que no estaban, se repinta.
+    if (KAOS_STORE.alEstarListo) {
+      KAOS_STORE.alEstarListo(() => {
+        if (!back.isConnected) return;
+        if (KAOS_STORE.sessions().length === list.length) return;
+        back.remove(); openSessionsDialog();
+      });
+    }
     back.addEventListener("click", (e) => {
-      const act = e.target.dataset && e.target.dataset.act;
+      // El objetivo del clic puede ser la <img> o un <span> de dentro de la
+      // tarjeta, que no llevan `data-act`. Se sube hasta el primero que lo
+      // tenga: la ✕ está más adentro que la tarjeta, así que gana ella y
+      // borrar sigue siendo borrar.
+      const quien = e.target.closest && e.target.closest("[data-act]");
+      const act = quien && quien.dataset.act;
       if (!act) return;
       if (act === "close") { back.remove(); return; }
       if (act === "compactar") {
-        e.target.disabled = true;
-        e.target.textContent = "ALIGERANDO…";
+        quien.disabled = true;
+        quien.textContent = "ALIGERANDO…";
         compactarHojas().then((r) => {
           back.remove();
           showToast(r.tocadas
@@ -2507,10 +2625,13 @@
         });
         return;
       }
-      const row = e.target.closest(".kd-row");
+      const row = e.target.closest(".kd-card");
       if (!row) return;
       if (act === "del") {
-        const b = e.target;
+        // La ✕ vive DENTRO de la tarjeta, y la tarjeta abre la hoja: sin esto,
+        // el mismo clic borraría y abriría a la vez.
+        e.stopPropagation();
+        const b = quien;
         if (b.dataset.seguro !== "1") {          // primer toque solo pregunta
           b.dataset.seguro = "1";
           b.textContent = "¿BORRAR?";
@@ -2521,22 +2642,239 @@
           }, 4000);
           return;
         }
-        KAOS_STORE.deleteSession(row.dataset.id); back.remove(); openSessionsDialog(); return;
+        // Se va con una animación corta en vez de desaparecer de golpe: así se
+        // ve CUÁL se ha ido, que es lo que importa cuando hay veinte tarjetas.
+        row.classList.add("kd-card-fuera");
+        const id = row.dataset.id;
+        setTimeout(() => {
+          KAOS_STORE.deleteSession(id);
+          if (back.isConnected) { back.remove(); openSessionsDialog(); }
+        }, 220);
+        return;
       }
       if (act === "open") { back.remove(); openSession(row.dataset.id); }
     });
   }
+  // RECONECTAR UNA HOJA A MANO
+  //
+  // Cuando a una hoja le faltan diseños y la huella no los encuentra (porque la
+  // hoja se guardó antes de que existieran las huellas), hay que decirle a mano
+  // cuál es cuál.
+  //
+  // La clave es que NO hay que adivinar: la hoja guarda una foto suya, y en esa
+  // foto SE VE el diseño que falta, en su sitio. Así que se enseña la foto con
+  // el hueco marcado en rojo — «éste es el que falta, ¿cuál de la galería es?».
+  //
+  // `nuevos` es la lista paralela a `idsViejos`: un id si esa posición está
+  // resuelta, null si es un hueco.
+  function reconectarHoja(s, idsViejos, nuevos, recuperados) {
+    const pl = (s.data && s.data.placements) || [];
+    const W = (s.data && s.data.width) || 1080;
+    const H = (s.data && s.data.height) || 1350;
+    const parejas = Array.isArray(pl) && pl.length === idsViejos.length;
+    // índice del hueco → EL DISEÑO de la galería (el objeto entero, que es lo
+    // que devuelve `elegirDeGaleria`, no su id).
+    const elegido = new Map();
+
+    function huecos() {
+      const out = [];
+      nuevos.forEach((v, i) => { if (!v) out.push(i); });
+      return out;
+    }
+
+    function pintar() {
+      const hs = huecos();
+      const marcas = parejas ? hs.map((i, n) => {
+        const p = pl[i];
+        if (!p) return "";
+        // De píxeles de la hoja a porcentaje, que es lo que entiende la foto
+        // sea cual sea el tamaño al que se esté enseñando.
+        const l = ((p.cx - p.w / 2) / W) * 100, t = ((p.cy - p.h / 2) / H) * 100;
+        const an = (p.w / W) * 100, al = (p.h / H) * 100;
+        return `<span class="rec-marca${elegido.has(i) ? " rec-ok" : ""}"
+                      style="left:${l}%;top:${t}%;width:${an}%;height:${al}%"
+                      data-hueco="${i}"><b>${n + 1}</b></span>`;
+      }).join("") : "";
+
+      const filas = hs.map((i, n) => {
+        const it = elegido.get(i) || null;
+        return `
+        <div class="rec-fila" data-hueco="${i}">
+          <span class="rec-num">${n + 1}</span>
+          <span class="rec-mini">${it
+            ? `<img src="${it.thumbUrl || it.layerUrl}" alt="">`
+            : `<span class="rec-vacio">?</span>`}</span>
+          <span class="rec-txt">${it ? escapeAttr(it.style || "—") : "Sin asignar"}</span>
+          <button class="icon-btn mini" data-act="pick" data-hueco="${i}">${it ? "CAMBIAR" : "ELEGIR"}</button>
+          <button class="icon-btn mini" data-act="drop" data-hueco="${i}">QUITAR</button>
+        </div>`;
+      }).join("");
+
+      const listos = hs.filter((i) => elegido.has(i)).length;
+      const quedan = idsViejos.length - hs.length + listos;
+      return `
+        <div class="kd-title">Reconectar «${escapeAttr(s.name)}»</div>
+        <div class="kd-body">A esta hoja le faltan ${hs.length}
+          ${hs.length === 1 ? "diseño" : "diseños"}${recuperados
+            ? " (he reconocido " + recuperados + " por su dibujo)" : ""}.
+          En la foto están marcados en rojo, con el diseño que había dentro:
+          mira cuál es y elígelo de la galería. Lo que quites se va de la hoja.</div>
+        <div class="rec-cuerpo">
+          <div class="rec-foto">${s.thumb
+            ? `<img src="${s.thumb}" alt="">`
+            : `<div class="kd-card-sinfoto">ESTA HOJA<br>NO GUARDÓ FOTO</div>`}${marcas}</div>
+          <div class="rec-lista">${filas}</div>
+        </div>
+        <div class="kd-actions">
+          <button class="icon-btn" data-act="close">CANCELAR</button>
+          <button class="btn" data-act="ok" ${quedan < 3 ? "disabled" : ""}>ABRIR CON ${quedan}</button>
+        </div>`;
+    }
+
+    const back = dialog(pintar());
+    function repintar() { back.querySelector(".kaos-dialog").innerHTML = pintar(); }
+
+    back.addEventListener("click", (e) => {
+      const quien = e.target.closest && e.target.closest("[data-act],[data-hueco]");
+      if (!quien) { if (e.target === back) back.remove(); return; }
+      const act = quien.dataset.act;
+      const hueco = quien.dataset.hueco;
+      if (act === "close") { back.remove(); return; }
+      if (act === "ok") {
+        back.remove();
+        // Se escribe la elección en la hoja GUARDADA y se vuelve a abrir por la
+        // puerta de siempre: así no hay dos maneras de abrir una hoja, que es
+        // como acaban separándose.
+        const ids = idsViejos.slice();
+        const fuera = [];
+        nuevos.forEach((v, i) => {
+          if (v) { ids[i] = v; return; }
+          // `.id`, no el objeto: `selectedIds` es una lista de ids, y meter
+          // ahí el diseño entero rompería todo lo que lo busca por id.
+          if (elegido.has(i)) ids[i] = elegido.get(i).id;
+          else fuera.push(i);
+        });
+        const d = JSON.parse(JSON.stringify(s.data));
+        if (fuera.length) {
+          const dentro = ids.map((_, i) => i).filter((i) => fuera.indexOf(i) < 0);
+          const plv = d.placements;
+          if (Array.isArray(plv) && plv.length === ids.length) {
+            d.placements = dentro.map((i) => plv[i]);
+          }
+          d.selectedIds = dentro.map((i) => ids[i]);
+          d.pagePlacements = {};
+          const vivos = new Set(d.selectedIds);
+          d.pageAssignment = (d.pageAssignment || [])
+            .map((g) => g.filter((x) => vivos.has(x))).filter((g) => g.length);
+        } else {
+          const trad = new Map();
+          idsViejos.forEach((x, i) => trad.set(x, ids[i]));
+          d.selectedIds = ids;
+          d.pageAssignment = (d.pageAssignment || [])
+            .map((g) => g.map((x) => trad.get(x) || x)).filter((g) => g.length);
+        }
+        // Y ahora sí se les guarda la huella, para que esto no vuelva a pasar
+        // con esta hoja.
+        d.huellas = {};
+        for (const gid of d.selectedIds) {
+          const it = KAOS_GALLERY.load().find((x) => x.id === gid);
+          if (it && it.huella) d.huellas[gid] = it.huella;
+        }
+        KAOS_STORE.saveSession(s.name, d, s.id);
+        openSession(s.id);
+        return;
+      }
+      if (act === "drop" && hueco != null) {
+        elegido.delete(parseInt(hueco, 10));
+        // Marcarlo como quitado a propósito: se cae de la hoja al aceptar.
+        repintar();
+        return;
+      }
+      if ((act === "pick" || quien.classList.contains("rec-marca")) && hueco != null) {
+        const i = parseInt(hueco, 10);
+        // `elegirDeGaleria` es el selector que ya usaban el fondo y «meter un
+        // diseño en la hoja». Devuelve EL DISEÑO, no su id — perder eso de
+        // vista fue justo lo que hacía que elegir no hiciera nada.
+        //
+        // El filtro deja fuera los que esta hoja ya lleva: si no, podría poner
+        // el mismo diseño dos veces sin querer y la hoja saldría repetida.
+        const puestos = new Set();
+        for (const v of nuevos) if (v) puestos.add(v);
+        for (const [, v] of elegido) if (v) puestos.add(v.id);
+        elegirDeGaleria(
+          (it) => { elegido.set(i, it); repintar(); },
+          "¿Cuál es el diseño del hueco " + (huecos().indexOf(i) + 1) + "?",
+          (x) => !puestos.has(x.id)
+        );
+      }
+    });
+  }
+
   function openSession(id) {
     const s = KAOS_STORE.getSession(id);
     if (!s || !s.data) return;
     const have = new Set(KAOS_GALLERY.load().map(i => i.id));
     Object.assign(composeState, s.data);
-    composeState.selectedIds = (composeState.selectedIds || []).filter(x => have.has(x));
-    composeState.pageAssignment = (composeState.pageAssignment || []).map(g => g.filter(x => have.has(x))).filter(g => g.length);
+
+    // RECONOCER POR EL DIBUJO
+    // Un id que ya no está no significa que el diseño se haya perdido: puede
+    // que lo borrara y volviera a subir el mismo archivo, y entonces tiene otro
+    // id. Antes de dar nada por perdido se busca por huella, que describe el
+    // dibujo y no cambia al volver a subirlo.
+    const huellas = s.data.huellas || {};
+    const cambio = new Map();
+    let recuperados = 0;
+    for (const viejo of (s.data.selectedIds || [])) {
+      if (have.has(viejo)) continue;
+      const it = KAOS_GALLERY.buscarPorHuella
+        ? KAOS_GALLERY.buscarPorHuella(huellas[viejo]) : null;
+      if (it) { cambio.set(viejo, it.id); recuperados++; }
+    }
+    // OJO CON LAS COLOCACIONES
+    // `placements` NO lleva id dentro: es una lista paralela a `selectedIds`,
+    // emparejada por posición (`placements[3]` es la colocación del diseño
+    // `selectedIds[3]`). Por eso cambiar un id es una SUSTITUCIÓN en su sitio y
+    // no toca las colocaciones para nada — la hoja se abre exactamente como la
+    // dejó. Y por eso, cuando hay que quitar un diseño, hay que quitar también
+    // su colocación en el MISMO índice, o todo lo de detrás se corre un puesto.
+    const idsViejos = (composeState.selectedIds || []).slice();
+    const nuevos = idsViejos.map((x) => (have.has(x) ? x : (cambio.get(x) || null)));
+    const perdidos = idsViejos.filter((x, i) => !nuevos[i]);
+    const trad = new Map();
+    idsViejos.forEach((x, i) => { if (nuevos[i]) trad.set(x, nuevos[i]); });
+
+    if (!perdidos.length) {
+      // Sustitución limpia: nada se cae, nada se mueve.
+      composeState.selectedIds = nuevos;
+      composeState.pageAssignment = (composeState.pageAssignment || [])
+        .map((g) => g.map((x) => trad.get(x) || x)).filter((g) => g.length);
+    } else {
+      const vivos = [];
+      idsViejos.forEach((x, i) => { if (nuevos[i]) vivos.push(i); });
+      const pl = composeState.placements;
+      if (Array.isArray(pl) && pl.length === idsViejos.length) {
+        composeState.placements = vivos.map((i) => pl[i]);
+      }
+      composeState.selectedIds = vivos.map((i) => nuevos[i]);
+      composeState.pageAssignment = (composeState.pageAssignment || [])
+        .map((g) => g.filter((x) => trad.has(x)).map((x) => trad.get(x)))
+        .filter((g) => g.length);
+      // Las colocaciones por página van emparejadas con la lista de esa página,
+      // que acaba de cambiar de tamaño. Se tiran y se rehacen: quedarse una
+      // lista descolocada es peor que recolocar.
+      composeState.pagePlacements = {};
+    }
     composeState.selectedIndex = null;
     composeState.pairActive = null;
     composeState.sheetMode = false;
-    if (composeState.selectedIds.length < 3) { showToast("Esa hoja ya no tiene suficientes diseños en la galería"); return; }
+
+    // Antes, si faltaban diseños, esto era un «ya no tiene suficientes» a secas
+    // y ahí se acababa: la hoja quedaba inaccesible para siempre. Ahora se le
+    // ofrece reconectarlos a mano, mirando la foto de la hoja.
+    if (perdidos.length) {
+      reconectarHoja(s, idsViejos, nuevos, recuperados);
+      return;
+    }
     currentSessionId = s.id; currentSessionName = s.name;
     composeDirty = false;
     galleryModal.style.display = "";
@@ -2556,7 +2894,19 @@
     const hasPages = Object.keys(composeState.pagePlacements || {}).length;
     if (!hasMain && !hasPages) resetPlacements();
     renderCompose();
-    showToast("Hoja recuperada · " + s.name);
+    if (recuperados) {
+      // Se vuelve a guardar con los ids nuevos: si no, la próxima vez habría
+      // que volver a reconocerlos, y si entretanto vuelve a tocar la galería
+      // podría quedarse sin poder hacerlo.
+      KAOS_STORE.saveSession(s.name, sheetSessionData(), s.id);
+      showToast("Hoja recuperada · " + s.name + " — he reconocido " + recuperados +
+        (recuperados === 1 ? " diseño que habías vuelto a subir." :
+                             " diseños que habías vuelto a subir."), 8000);
+    } else {
+      // Aquí no puede haber huecos: si los hubiera, se habría ido antes a
+      // `reconectarHoja`.
+      showToast("Hoja recuperada · " + s.name);
+    }
   }
   const backupExportBtn = $("#backupExportBtn");
   const backupImportBtn = $("#backupImportBtn");
@@ -2818,8 +3168,9 @@
     if (n < 3) { composeBtn.disabled = true; selStatus.textContent = `ELIGE 3 O MÁS (LLEVAS ${n})`; }
     else {
       composeBtn.disabled = false;
-      const pages = pageBounds(n).length;
-      selStatus.textContent = pages > 1 ? `${n} ELEGIDOS · ${pages} HOJAS · LISTO` : `${n} ELEGIDOS · LISTO`;
+      // Ya no se reparten solos, así que no se anuncian hojas que no van a
+      // salir: entran todos en una y ella añade las que quiera con el «+».
+      selStatus.textContent = `${n} ELEGIDOS · LISTO`;
     }
     const moveBtn = document.getElementById("moveSelectedBtn");
     if (moveBtn) {
@@ -2880,6 +3231,11 @@
   // el reparto salta a dos hojas. Estaba en 8, y el rótulo de la galería decía 5,
   // así que anunciaba dos hojas y luego apretaba los ocho en una.
   const PAGE_SIZE = 5;
+  // Cuántos diseños hacen que una hoja se considere LLENA al arrastrarle otro
+  // encima (entonces intercambia en vez de amontonar). Va aparte de PAGE_SIZE
+  // porque ya no reparte nada: desde que las hojas las decide ella, cortar a
+  // los cinco era decirle que no a algo que había pedido a mano.
+  const HOJA_LLENA = 12;
   // Balanced chunking: ceil(n/PAGE_SIZE) pages, remainder spread across the first pages.
   function pageBounds(n) {
     const pages = Math.max(1, Math.ceil(n / PAGE_SIZE));
@@ -2892,11 +3248,161 @@
   // Auto-assign selected ids into balanced pages of up to 8 each. Called once per
   // compose-session open; after that the user's manual drag assignment (which
   // decides which design lands on which sheet) is authoritative.
+  // TODO EN UNA HOJA, salvo que ella diga lo contrario.
+  //
+  // Antes esto repartía los diseños en hojas de cinco en cuanto pasabas de
+  // cinco: montabas una plancha y de pronto tenías dos, sin haberlo pedido y
+  // sin manera evidente de deshacerlo. Ahora una hoja es una hoja, y las de
+  // más se añaden a mano con el «+» de al lado de la previa.
   function ensurePageAssignment() {
-    const bounds = pageBounds(composeState.selectedIds.length);
-    composeState.pageAssignment = bounds.map(([s, e]) => composeState.selectedIds.slice(s, e));
+    const sel = composeState.selectedIds;
+    const pa = composeState.pageAssignment;
+    // Si ya había un reparto suyo, se RESPETA. Esto se llama cada vez que entra
+    // al editor, así que rehacerlo a lo bruto significaba que añadir un diseño
+    // le deshacía las hojas que hubiera montado a mano.
+    if (Array.isArray(pa) && pa.length) {
+      const dentro = new Set();
+      for (const g of pa) for (const id of g) dentro.add(id);
+      // Fuera los que ya no están elegidos.
+      const vivos = new Set(sel);
+      composeState.pageAssignment = pa
+        .map((g) => g.filter((id) => vivos.has(id)))
+        .filter((g, i) => g.length || i === 0);
+      if (!composeState.pageAssignment.length) composeState.pageAssignment = [[]];
+      // Y los nuevos, a la ÚLTIMA hoja: es donde estaba trabajando.
+      const ultima = composeState.pageAssignment[composeState.pageAssignment.length - 1];
+      for (const id of sel) if (!dentro.has(id)) ultima.push(id);
+      return;
+    }
+    composeState.pageAssignment = [sel.slice()];
   }
+  // Añade una hoja vacía al final y se va a ella, como abrir una mesa de
+  // trabajo nueva al lado. De ahí se arrastran los diseños que quiera.
+  function anadirPagina() {
+    if (!composeState.pageAssignment) ensurePageAssignment();
+    composeState.pageAssignment.push([]);
+    composeState.pageIndex = composeState.pageAssignment.length - 1;
+    composeState.pairStart = Math.max(0, composeState.pageAssignment.length - 2);
+    composeState.selectedIndex = null;
+    composeState.pairActive = null;
+    composeState.pagePlacements = {};
+    composeDirty = true;
+    pintarPestanasHoja();
+    updatePageToolbar();
+    updateGizmo();
+    renderCompose();
+  }
+  // Quita una hoja. Sus diseños NO se pierden: se pasan a la anterior. Perder
+  // trabajo por cerrar una pestaña sería exactamente el fallo de CLEAR ALL.
+  function quitarPagina(i) {
+    const pa = composeState.pageAssignment;
+    if (!pa || pa.length <= 1 || !pa[i]) return;
+    const suyos = pa[i];
+    const destino = i > 0 ? i - 1 : 1;
+    if (suyos.length) {
+      for (const id of suyos) if (pa[destino].indexOf(id) < 0) pa[destino].push(id);
+    }
+    pa.splice(i, 1);
+    composeState.pageIndex = Math.min(composeState.pageIndex || 0, pa.length - 1);
+    composeState.pairStart = Math.min(composeState.pairStart || 0, Math.max(0, pa.length - 2));
+    composeState.selectedIndex = null;
+    composeState.pairActive = null;
+    composeState.pagePlacements = {};
+    composeDirty = true;
+    pintarPestanasHoja();
+    updatePageToolbar();
+    updateGizmo();
+    renderCompose();
+    if (suyos.length) showToast("Hoja quitada · sus " + suyos.length +
+      (suyos.length === 1 ? " diseño ha pasado" : " diseños han pasado") + " a la anterior", 6000);
+  }
+  // Las pestañas de hoja, al lado de la previa. Se repintan enteras cada vez:
+  // son cuatro botones, y así no hay que llevar la cuenta de qué cambió.
+  const hojaPestanas = $("#hojaPestanas");
+  function pintarPestanasHoja() {
+    if (!hojaPestanas) return;
+    const pa = composeState.pageAssignment || [];
+    hojaPestanas.textContent = "";
+    // Con una sola hoja y ningún diseño todavía, esto sería ruido: la barra
+    // aparece en cuanto hay algo que enseñar.
+    if (!composeState.selectedIds.length) { hojaPestanas.hidden = true; return; }
+    hojaPestanas.hidden = false;
+    pa.forEach((grupo, i) => {
+      const b = document.createElement("button");
+      b.type = "button";
+      b.className = "hoja-tab" + (i === (composeState.pageIndex || 0) ? " on" : "");
+      b.title = "Ir a la hoja " + (i + 1);
+      const n = document.createElement("span");
+      n.className = "hoja-tab-n";
+      n.textContent = String(i + 1);
+      const c = document.createElement("span");
+      c.className = "hoja-tab-c";
+      c.textContent = grupo.length;
+      b.append(n, c);
+      b.addEventListener("click", () => {
+        composeState.pageIndex = i;
+        composeState.pairStart = Math.max(0, Math.min(i, pa.length - 2));
+        composeState.selectedIndex = null;
+        composeState.pairActive = null;
+        pintarPestanasHoja();
+        updatePageToolbar();
+        updateGizmo();
+        renderCompose();
+      });
+      if (pa.length > 1) {
+        // Reordenar. El orden de las hojas es el orden en que se exportan y en
+        // que salen en un reel, así que tiene que poder cambiarse sin vaciar
+        // una y volver a llenarla a mano.
+        const mueve = (b2) => {
+          if (b2 < 0 || b2 >= pa.length) return;
+          const t = pa[i]; pa[i] = pa[b2]; pa[b2] = t;
+          // La colocación va por hoja y se guarda con la clave de la página:
+          // al intercambiarlas hay que rehacerla, o cada hoja saldría con la
+          // distribución de la otra.
+          composeState.pagePlacements = {};
+          composeState.pageIndex = b2;
+          composeState.selectedIndex = null;
+          composeState.pairActive = null;
+          composeDirty = true;
+          pintarPestanasHoja();
+          updatePageToolbar();
+          updateGizmo();
+          renderCompose();
+        };
+        const izq = document.createElement("span");
+        izq.className = "hoja-tab-mv";
+        izq.textContent = "◀";
+        izq.title = "Mover esta hoja hacia delante";
+        if (i === 0) izq.classList.add("no");
+        izq.addEventListener("click", (e) => { e.stopPropagation(); if (i > 0) mueve(i - 1); });
+        const der = document.createElement("span");
+        der.className = "hoja-tab-mv";
+        der.textContent = "▶";
+        der.title = "Mover esta hoja hacia atrás";
+        if (i === pa.length - 1) der.classList.add("no");
+        der.addEventListener("click", (e) => { e.stopPropagation(); if (i < pa.length - 1) mueve(i + 1); });
+
+        const x = document.createElement("span");
+        x.className = "hoja-tab-x";
+        x.textContent = "✕";
+        x.title = "Quitar esta hoja (sus diseños pasan a la anterior)";
+        x.addEventListener("click", (e) => { e.stopPropagation(); quitarPagina(i); });
+        b.append(izq, der, x);
+      }
+      hojaPestanas.appendChild(b);
+    });
+    const mas = document.createElement("button");
+    mas.type = "button";
+    mas.className = "hoja-tab hoja-tab-mas";
+    mas.textContent = "+";
+    mas.title = "Añadir otra hoja";
+    mas.setAttribute("aria-label", "Añadir otra hoja");
+    mas.addEventListener("click", anadirPagina);
+    hojaPestanas.appendChild(mas);
+  }
+
   function updatePageToolbar() {
+    pintarPestanasHoja();
     if (!sheetPair) return;
     if (composeState.sheetMode) { hidePair(); return; }
     const pages = pageCount();
@@ -3143,7 +3649,7 @@
       const toArr = composeState.pageAssignment[target._pageIdx];
       const srcPos = fromArr.indexOf(sheetDrag.id);
       const [dmx, dmy] = sheetXY(target, e.clientX, e.clientY);
-      if (toArr && toArr.length >= PAGE_SIZE && srcPos >= 0) {
+      if (toArr && toArr.length >= HOJA_LLENA && srcPos >= 0) {
         // target sheet is full → swap with the design it was dropped on (or the nearest one)
         let hit = sheetHitTest(target, dmx, dmy);
         if (hit < 0) hit = nearestItemIndex(target, dmx, dmy);
@@ -3169,7 +3675,7 @@
       }
     }
     sheetDrag.active = false;
-    if (!moving && sheetDrag.moved && sheetDrag.canvas && (sheetDrag.canvas._placements || []).length > 1) {
+    if (!moving && sheetDrag.moved && autoRecoloca() && sheetDrag.canvas && (sheetDrag.canvas._placements || []).length > 1) {
       KAOS_GALLERY.relaxAround(sheetDrag.canvas._placements, sheetDrag.idx, sheetRegion(), sheetGap());
       composeDirty = true;
     }
@@ -3802,9 +4308,13 @@
   const bgFotoInput = $("#bgFotoInput");
   if ($("#bgFotoBtn")) $("#bgFotoBtn").addEventListener("click", () => bgFotoInput.click());
   if (bgFotoInput) {
-    bgFotoInput.addEventListener("change", () => {
-      const f = bgFotoInput.files && bgFotoInput.files[0];
+    bgFotoInput.addEventListener("change", async () => {
+      const bruto = bgFotoInput.files && bgFotoInput.files[0];
       bgFotoInput.value = "";
+      if (!bruto) return;
+      // Un HEIC leido tal cual da un data: que el navegador no sabe pintar, y
+      // el fondo se quedaba en blanco sin decir por que.
+      const f = (await normalizarFotos([bruto]))[0];
       if (!f) return;
       const fr = new FileReader();
       fr.onload = () => {
@@ -3909,6 +4419,10 @@
     ));
     chromeOpts.showSizes = false;
     chromeOpts.stamps = 0;
+    // Con la foto a sangre los textos los pinta ESTA capa, no `renderCollage`
+    // directamente. Si no se le pasara el sitio donde caen, el doble clic para
+    // escribir dejaría de funcionar justo en el modo pegatina.
+    if (layerOpts.cajasTexto) chromeOpts.cajasTexto = layerOpts.cajasTexto;
     // Sin marco la hoja se queda en transparente (pliego de pegatinas para
     // troquelar). CON marco se pinta el fondo entero de la hoja — papel y foto
     // — igual que en una composicion normal: `sheetRenderOpts` ya los trae,
@@ -4058,7 +4572,7 @@
   // encima los diseños recortados como pegatinas. Un solo sitio, porque la
   // usan la vista previa Y la exportación — antes cada una pintaba lo suyo y
   // por eso lo que guardaba no era lo que estaba mirando.
-  async function componerSticker(canvas, items, rec) {
+  async function componerSticker(canvas, items, rec, cajasT) {
     const W = canvas.width, H = canvas.height;
     const ctx = canvas.getContext("2d");
     ctx.setTransform(1, 0, 0, 1, 0, 0);
@@ -4078,7 +4592,7 @@
     // `soloPapel` deja el halo en papel aunque detrás haya foto: si el halo
     // llevara la misma foto, la pegatina se camuflaría con el fondo y no se
     // vería el recorte.
-    await renderStickerLayer(capa, items, rec, { soloPapel: true });
+    await renderStickerLayer(capa, items, rec, { soloPapel: true, cajasTexto: cajasT });
     ctx.drawImage(capa, 0, 0, W, H);
     capa.width = capa.height = 1;
   }
@@ -4087,7 +4601,7 @@
     if (composeState.bgMode !== "sticker" || !items.length) {
       return KAOS_GALLERY.renderCollage(canvas, items, opts);
     }
-    await componerSticker(canvas, items, rec);
+    await componerSticker(canvas, items, rec, opts.cajasTexto);
     // Los «N CM» van DESPUÉS y sobre el lienzo de la previa, no dentro de la
     // capa de stickers: el pintado de stickers los apaga a propósito (en la
     // hoja exportada estorban) y además así el doble clic para editar la
@@ -4324,6 +4838,7 @@
   // se fuerza a 0: ese modo es la foto tal cual, y lavarla con papel encima
   // sería justo lo contrario de lo que se busca.
   function aplicarBgMode() {
+    pintarFondosMarca();
     const m = composeState.bgMode || "papelFoto";
     // Si no ha elegido foto suya, se usa la foto de fondo de flash de la marca.
     // Antes se pasaba null y el modo «papel + foto» salía sin foto ninguna.
@@ -4381,10 +4896,44 @@
 
   // La pone y repinta. `origen` puede ser un data: o null.
   async function ponerFondo(origen) {
+    // Quién manda ahora: si el origen es uno de los fondos de la marca se
+    // recuerda cuál, y si es una foto suya del disco se olvida. Ponerlo aquí y
+    // no en cada botón evita que elegir su foto deje encendido el de la marca.
+    const marca = KAOS_GALLERY.FONDOS_MARCA || [];
+    fondoMarcaPuesto = (typeof origen === "string" && marca.some((f) => f.src === origen))
+      ? origen : null;
     composeState.bgImg = origen ? await encogerFondo(origen) : null;
     aplicarBgMode();
     composeDirty = true;
+    pintarFondosMarca();
     repintarHoja();
+  }
+
+  // Los fondos de la marca, como botones con nombre. La lista sale de
+  // gallery.js (FONDOS_MARCA), no de aquí: así añadir uno aparece a la vez en
+  // el flash post y en el reel, sin tener que acordarse de tocar los dos.
+  //
+  // Se marca el que está puesto. Como `bgImg` guarda la foto ya encogida (no la
+  // ruta), se recuerda aparte cuál se eligió: comparar imágenes para saber si
+  // son la misma sería carísimo y además fallaría en cuanto cambie el encogido.
+  let fondoMarcaPuesto = null;
+  const bgMarcaFila = $("#bgMarcaFila");
+  function pintarFondosMarca() {
+    if (!bgMarcaFila || !KAOS_GALLERY.FONDOS_MARCA) return;
+    if (!composeState.bgImg) fondoMarcaPuesto = null;
+    bgMarcaFila.textContent = "";
+    const et = document.createElement("span");
+    et.className = "tip";
+    et.textContent = "De la marca:";
+    bgMarcaFila.appendChild(et);
+    for (const f of KAOS_GALLERY.FONDOS_MARCA) {
+      const b = document.createElement("button");
+      b.type = "button";
+      b.className = "icon-btn" + (fondoMarcaPuesto === f.src ? " on" : "");
+      b.textContent = f.nombre;
+      b.addEventListener("click", () => { ponerFondo(f.src); });
+      bgMarcaFila.appendChild(b);
+    }
   }
   // Un solo sitio que decida qué vista hay que repintar: el composer tiene tres
   // (hoja suelta, par de hojas, y «una hoja por diseño») y equivocarse deja la
@@ -4457,6 +5006,15 @@
     showToast("Añadido a esta hoja");
   }
 
+  // En MANUAL manda ella y NADA se recoloca solo: ni al arrastrar, ni al
+  // escalar, ni al girar. Fuera de manual (Tight / Scatter) la hoja sí se
+  // ordena sola, y apartar al vecino que acaba de quedar debajo es parte del
+  // trato — ahí sí se hace.
+  //
+  // Antes esto no miraba el modo: escalabas un diseño y de rebote se movían
+  // los otros tres. En una hoja colocada a mano eso es deshacerle el trabajo.
+  function autoRecoloca() { return composeState.layout !== "manual"; }
+
   function resetPlacements() {
     const items = currentItems();
     if (items.length < 3) { composeState.placements = []; composeState.order = []; return; }
@@ -4493,6 +5051,106 @@
     const bounds = pageBounds(sel.length)[composeState.pageIndex || 0] || [0, PAGE_SIZE];
     return sel.slice(bounds[0], bounds[1]);
   }
+
+
+  // ============== RETÍCULA, IMANTADO Y TEXTOS EN LA PROPIA HOJA ==============
+  // La misma lógica que el reel, y literalmente el mismo fichero: retícula de
+  // diseño, imantado a sus líneas y textos que se escriben con doble clic sobre
+  // la previa. Que sea el MISMO módulo no es por ahorrar: si la cuenta del
+  // imantado estuviera dos veces, un día imantarían distinto en cada sitio y
+  // nadie sabría cuál es la buena.
+  //
+  // Aquí va en modo PASIVO. La hoja ya tiene su ratón montado —los tiradores de
+  // escala, el ✕ de borrar, el doble clic sobre los «N CM», el arrastre entre
+  // hojas— y dos manejadores peleándose por el mismo gesto es peor que no tener
+  // capa. Así que el módulo sólo pinta la retícula, enciende las guías que están
+  // agarrando y abre el campo de texto; quien manda sigue siendo este fichero.
+  //
+  // Los textos de la hoja se editan pero NO se mueven: el sitio del título, del
+  // @ y del pie lo calcula el pintado a partir del sangrado y del formato, y
+  // dejarlos sueltos aquí sería que el pintado y la mano dijeran cosas
+  // distintas sobre dónde va cada uno. Lo que se arrastra son los diseños.
+  const cajasTexto = {};
+  let directoPost = null;
+  let directoWH = "";
+  const TEXTOS_HOJA = {
+    title:       { campo: "title",       input: "#composeTitle" },
+    handle:      { campo: "handle",      input: "#composeHandle" },
+    footer:      { campo: "footer",      input: "#composeFooter" },
+    footerTitle: { campo: "footerTitle", input: "#composeFooterTitle" },
+  };
+  function piezasTextoHoja() {
+    const out = [];
+    for (const k in TEXTOS_HOJA) {
+      const c = cajasTexto[k];
+      if (!c) continue;
+      out.push({ id: k, tipo: "texto", x: c.x, y: c.y, w: c.w, h: c.h, rot: 0,
+                 texto: composeState[TEXTOS_HOJA[k].campo], tam: c.tam,
+                 mover: false, girar: false });
+    }
+    return out;
+  }
+  function editarTextoHoja(id, txt) {
+    const r = TEXTOS_HOJA[id];
+    if (!r) return;
+    composeState[r.campo] = txt;
+    // El campo del panel de al lado enseña lo mismo: si no, escribe en la hoja
+    // y el panel sigue enseñando lo viejo.
+    const inp = $(r.input);
+    if (inp) inp.value = txt;
+    composeDirty = true;
+    renderCompose();
+  }
+  function montarDirectoHoja() {
+    if (!window.KAOS_DIRECTO || !composeCanvas) return;
+    const wrap = document.querySelector(".compose-canvas-wrap");
+    if (!wrap) return;
+    // El lienzo cambia de medidas al cambiar de formato, y la capa se pinta a
+    // esas medidas. Cuando cambian, se rehace.
+    const wh = composeState.width + "x" + composeState.height;
+    if (directoPost && directoWH === wh) return;
+    if (directoPost) { directoPost.destruir(); directoPost = null; }
+    directoPost = window.KAOS_DIRECTO.montar(composeCanvas, {
+      W: composeState.width, H: composeState.height,
+      marco: wrap,
+      pasivo: true,
+      // El sangrado, no el 5,5% del reel: así las guías caen sobre las esquinas
+      // del marco que ella está viendo. Con sangrado 0 la retícula se pegaría
+      // al canto del papel, que no es una guía útil — de ahí el mínimo.
+      margen: Math.max(0.02, composeState.bleed || 0),
+      piezas: piezasTextoHoja,
+      alEditar: editarTextoHoja,
+      repintar: renderCompose,
+    });
+    directoWH = wh;
+    if (directoPost) directoPost.rejilla(composeState.rejilla !== false);
+  }
+  // Las guías del imantado, con los mismos números que el reel.
+  function imantarHoja(x, y, p, alt) {
+    if (!window.KAOS_DIRECTO || alt) {
+      if (directoPost) directoPost.pistas([]);
+      return { x: x, y: y };
+    }
+    const W = composeState.width, H = composeState.height;
+    const g = window.KAOS_DIRECTO.lineas(W, H, Math.max(0.02, composeState.bleed || 0));
+    const ix = window.KAOS_DIRECTO.imantar(x, p.w / 2, g.vs.concat([W / 2]));
+    const iy = window.KAOS_DIRECTO.imantar(y, p.h / 2, g.hs.concat([H / 2]));
+    const pistas = [];
+    if (ix) { x += ix.d; pistas.push({ v: ix.g }); }
+    if (iy) { y += iy.d; pistas.push({ h: iy.g }); }
+    if (directoPost) directoPost.pistas(pistas);
+    return { x: x, y: y };
+  }
+  window.addEventListener("resize", () => { if (directoPost) directoPost.refrescar(); });
+  (function () {
+    const chk = $("#composeRejilla");
+    if (!chk) return;
+    chk.checked = composeState.rejilla !== false;
+    chk.addEventListener("change", () => {
+      composeState.rejilla = chk.checked;
+      if (directoPost) directoPost.rejilla(chk.checked);
+    });
+  })();
 
   // ----- drag-to-move on compose canvas -----
   const drag = { active: false, idx: -1, offX: 0, offY: 0, moved: false };
@@ -4540,28 +5198,39 @@
     if (!drag.active) return;
     const [mx, my] = composeXY(e);
     const p = composeState.placements[drag.idx];
-    p.cx = mx - drag.offX;
-    p.cy = my - drag.offY;
+    // Imanta a la retícula, igual que en el reel. Alt se la salta: a veces hace
+    // falta dejar algo justo fuera de la línea, y una guía de la que no puedes
+    // escaparte deja de ayudar y estorba.
+    const q = imantarHoja(mx - drag.offX, my - drag.offY, p, e.altKey);
+    p.cx = q.x;
+    p.cy = q.y;
     drag.moved = true;
     updateGizmo();
     renderCompose();
   });
   function endDrag() {
-    if (drag.active && drag.moved && composeState.placements.length > 1) {
+    // La hoja queda tocada por el hecho de haberla movido, se aparten los
+    // vecinos o no. Antes esto vivía dentro del `if` de apartar, así que en
+    // Manual el arrastre no marcaba la hoja como cambiada.
+    if (drag.active && drag.moved) composeDirty = true;
+    if (drag.active && drag.moved && autoRecoloca() && composeState.placements.length > 1) {
       // Only nudge neighbours the dragged piece actually overlaps — every other
       // piece stays exactly where it was.
       KAOS_GALLERY.nudgeAround(composeState.placements, drag.idx, sheetRegion(), sheetGap());
       composeDirty = true;
       renderCompose();
     }
+    if (directoPost) directoPost.pistas([]);
     drag.active = false;
     composeCanvas.classList.remove("dragging");
   }
 
   // ----- double-click on size label to edit -----
   composeCanvas.addEventListener("dblclick", (e) => {
-    const labels = composeCanvas._sizeLabelPositions;
-    if (!labels || !labels.length) return;
+    // Sin «N CM» en la hoja se seguía hasta los textos: antes esto se iba de
+    // vacío y el doble clic sobre el título no hacía nada cuando las medidas
+    // estaban apagadas.
+    const labels = composeCanvas._sizeLabelPositions || [];
     const [mx, my] = composeXY(e);
     for (const lbl of labels) {
       if (Math.abs(mx - lbl.cx) < lbl.w / 2 && Math.abs(my - lbl.cy) < lbl.h / 2) {
@@ -4598,6 +5267,16 @@
           if (ke.key === "Escape") { inp.value = lbl.cm; inp.blur(); }
         });
         return;
+      }
+    }
+    // Ningún «N CM» debajo. ¿Hay un texto? Se abre para escribirlo ahí mismo,
+    // igual que en el reel.
+    if (directoPost) {
+      for (const t of piezasTextoHoja()) {
+        if (Math.abs(mx - t.x) <= t.w / 2 && Math.abs(my - t.y) <= t.h / 2) {
+          directoPost.editar(t.id);
+          return;
+        }
       }
     }
   });
@@ -4751,6 +5430,7 @@
   const gizmoStick = $("#gizmoStick");
   const gizmoRotate = $("#gizmoRotate");
   const gizmoDelete = $("#gizmoDelete");
+  const gizmoMirror = $("#gizmoMirror");
   const gizmoCorners = $$(".gizmo-corner", composeGizmo);
   const composeWrap = $(".compose-canvas-wrap");
 
@@ -4797,6 +5477,16 @@
     const delPt = canvasToWrap(p.cx + rdx, p.cy + rdy);
     gizmoDelete.style.left = delPt.x + "px";
     gizmoDelete.style.top = delPt.y + "px";
+    // El espejo va al lado de la ✕, no encima del diseño: los dos son botones
+    // que se pulsan, así que viven juntos abajo. Se aparta a la izquierda
+    // siguiendo el giro, para que no se solapen ni cuando la pieza está tumbada.
+    if (gizmoMirror) {
+      const [mx2, my2] = rotatePt(-gap * 0.9, hh + gap * 0.7, rot);
+      const mirPt = canvasToWrap(p.cx + mx2, p.cy + my2);
+      gizmoMirror.style.left = mirPt.x + "px";
+      gizmoMirror.style.top = mirPt.y + "px";
+      gizmoMirror.classList.toggle("on", !!p.espejo);
+    }
     const topPt = canvasToWrap(p.cx + tux, p.cy + tuy);
     const dx = rotPt.x - topPt.x, dy = rotPt.y - topPt.y;
     const len = Math.sqrt(dx * dx + dy * dy);
@@ -4807,14 +5497,66 @@
     gizmoStick.style.transform = `rotate(${ang}deg)`;
   }
 
+  // ESPEJO. Voltea el diseño seleccionado de izquierda a derecha. Sirve para
+  // que dos piezas parecidas no miren para el mismo lado en la hoja, que es lo
+  // que hace que una plancha de flash parezca fotocopiada.
+  //
+  // Es un interruptor: se vuelve a pulsar y vuelve a su sitio. No toca la
+  // galería —el diseño original se queda como está—, sólo cómo se pinta EN ESTA
+  // hoja, así que el mismo diseño puede salir volteado aquí y normal en otra.
+  function espejarSeleccionado() {
+    const idx = composeState.selectedIndex;
+    if (idx == null) return;
+    const p = editPlacements()[idx];
+    if (!p) return;
+    pushComposeUndo();
+    p.espejo = !p.espejo;
+    composeDirty = true;
+    updateGizmo();
+    if (sheetPair && sheetPair.style.display !== "none") renderSheetPair();
+    else renderCompose();
+  }
+  let espejoGuard = 0;
+  if (gizmoMirror) {
+    // Igual que la ✕: se actúa en `pointerdown` y `preventDefault()` mata el
+    // clic sintético del iPad, por eso hace falta la guarda de tiempo. Sin
+    // esto, en el iPad el botón no respondía; con las dos y sin guarda, en el
+    // PC se volteaba dos veces y parecía que no hacía nada.
+    gizmoMirror.addEventListener("pointerdown", (e) => {
+      e.preventDefault(); e.stopPropagation();
+      espejoGuard = Date.now();
+      espejarSeleccionado();
+    });
+    gizmoMirror.addEventListener("click", (e) => {
+      e.stopPropagation();
+      if (Date.now() - espejoGuard < 700) return;
+      espejarSeleccionado();
+    });
+  }
+
   // quick delete: drop the selected design out of this sheet
   function deleteSelectedDesign() {
     const idx = composeState.selectedIndex;
     if (idx == null) return;
     const cv = composeState.pairActive;
     const items = (cv && cv._items) ? cv._items : currentItems();
-    const it = items[idx];
-    if (!it) return;
+    let it = items[idx];
+    if (!it) {
+      // AQUÍ SE QUEDABA. `idx` lo pone el gizmo, que cuenta sobre
+      // `editPlacements()`; el diseño se buscaba en `currentItems()`, que es
+      // OTRA lista. Cuando las dos no miden lo mismo —una hoja guardada abre
+      // con sus colocaciones tal cual, sin recalcular— `it` salía vacío y esto
+      // se iba con un `return` a secas: la ✕ no borraba y no decía nada.
+      //
+      // Se prueba con el último de la lista, que es el caso real cuando la hoja
+      // trae más colocaciones que diseños. Y si aun así no hay nada, se dice: un
+      // botón que no hace nada y encima calla es peor que uno que falla en alto.
+      it = items.length ? items[Math.min(idx, items.length - 1)] : null;
+      if (!it) {
+        showToast("No he podido identificar ese diseño. Cierra la hoja y vuelve a abrirla.", 7000);
+        return;
+      }
+    }
     pushComposeUndo();
     if (cv && cv._items && composeState.pageAssignment) {
       const arr = composeState.pageAssignment[cv._pageIdx] || [];
@@ -4826,8 +5568,18 @@
     composeState.selectedIds = composeState.selectedIds.filter(x => x !== it.id);
     composeState.selectedIndex = null;
     composeState.pairActive = null;
-    composeState.pagePlacements = {};
-    resetPlacements();
+    // En MANUAL manda ella: quitar un diseño no puede recolocar los otros. Se
+    // saca su colocación del mismo hueco (la lista va emparejada por posición
+    // con los diseños, así que quitar sólo el id descuadraría todo lo de
+    // detrás) y las demás se quedan donde estaban.
+    const pl = composeState.placements;
+    if (composeState.layout === "manual" && !cv && Array.isArray(pl) && pl[idx]) {
+      pl.splice(idx, 1);
+      composeState.order = pl.map((_, i) => i);
+    } else {
+      composeState.pagePlacements = {};
+      resetPlacements();
+    }
     updatePageToolbar();
     updateGizmo();
     if (sheetPair && sheetPair.style.display !== "none") renderSheetPair();
@@ -4894,6 +5646,13 @@
     } else {
       const ang = Math.atan2(my - gizmoDrag.cy, mx - gizmoDrag.cx) * 180 / Math.PI;
       let rot = gizmoDrag.startRot + (ang - gizmoDrag.startAngle);
+      // Los mismos 15° que el reel, con la misma tolerancia. A ojo no se clava
+      // un ángulo redondo ni queriendo.
+      if (!e.altKey && window.KAOS_DIRECTO) {
+        const paso = window.KAOS_DIRECTO.PASO_GIRO, tol = window.KAOS_DIRECTO.IMAN_GIRO;
+        const cerca = Math.round(rot / paso) * paso;
+        if (Math.abs(rot - cerca) <= tol) rot = cerca;
+      }
       while (rot > 180) rot -= 360;
       while (rot < -180) rot += 360;
       p.rot = rot;
@@ -4904,6 +5663,15 @@
   });
   function relaxAfterResize() {
     if (!gizmoDrag || gizmoDrag.mode !== "scale") return;
+    if (!autoRecoloca()) {
+      // Manual: se ha escalado ESE diseño y ahí se acaba. Los demás no se
+      // enteran.
+      composeDirty = true;
+      gizmoDrag = null;
+      editRepaint();
+      updateGizmo();
+      return;
+    }
     const ps = editPlacements();
     const region = KAOS_GALLERY.usableRegion({
       width: composeState.width, height: composeState.height, bleed: composeState.bleed,
@@ -4929,11 +5697,14 @@
       composeRAF = requestAnimationFrame(async () => {
         composeRAF = null;
         if (composeState.sheetMode) {
+          // Una hoja por diseño: ahí no hay ni retícula ni textos que tocar.
+          if (directoPost) directoPost.activar(false);
           const it = composeState.sheetTargets[composeState.sheetIndex];
           if (it) await renderOneSheet(composeCanvas, it);
           resolve();
           return;
         }
+        for (const k in cajasTexto) delete cajasTexto[k];
         const items = currentItems();
         if (items.length < 3) { resolve(); return; }
         const rs = previewScale();
@@ -4980,8 +5751,17 @@
           cornerColor: composeState.cornerColor,
           logoColor: composeState.logoColor,
           selectedIndex: composeState.selectedIndex,
+          cajasTexto: cajasTexto,
         }, { placements: composeState.placements, order: composeState.order, layout: composeState.layout });
         updateGizmo();
+        // Después de pintar, no antes: la capa pregunta dónde ha quedado cada
+        // texto, y eso sólo se sabe una vez pintada la hoja.
+        montarDirectoHoja();
+        if (directoPost) {
+          const enPareja = sheetPair && sheetPair.style.display !== "none";
+          directoPost.activar(!enPareja);
+          directoPost.refrescar();
+        }
         resolve();
       });
     }).then(() => {
@@ -5546,6 +6326,12 @@
     // que la nueva. Yendo derecho a addFiles, la primera se quedaba fuera.
     recibirFotos,
     setSourceCanvas: function (canvas, opts) { adoptSourceCanvas(canvas, opts || {}); },
+    // La usa reel.js. Antes el reel pintaba su propia pegatina —crema plano,
+    // tinta en multiply, sin cerrar los huecos de dentro— y no se parecía a la
+    // del flash post. Ahora es literalmente la misma función, así que el papel,
+    // la textura, la sombra y el halo de 0,5 cm salen idénticos en los dos
+    // sitios, y si ella cambia el papel en el flash post el reel lo hereda.
+    pegatina: renderSticker,
     autoTuneCurrent: autoTuneCurrent,
     switchStyle: switchStyle,
     openAi: openAi,
