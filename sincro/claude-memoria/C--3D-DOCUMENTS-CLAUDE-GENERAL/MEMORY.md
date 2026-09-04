@@ -1,0 +1,2 @@
+- [UI design standard](feedback_ui_design_standard.md) — always apply awwwards-level design craft (palette, type, motion, organic shapes) to interface/UI requests, not boxy generic AI UI.
+- [UX usage study](feedback_ux_usage_study.md) — instrument every interface with usage.js by default; weekly, offer UX improvements derived from real usage data + installed UX skills, never from guesses.
