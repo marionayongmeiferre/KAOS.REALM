@@ -154,11 +154,17 @@ if (Test-Path $mem) {
   # la carpeta esta en otro sitio, el nombre es otro y Claude no encontraria
   # nada — tendria la memoria en el disco y aun asi no sabria quien eres.
   #
-  # El guion bajo SE RESPETA: "C:\CLAUDE_TREBALLS" da "C--CLAUDE_TREBALLS".
-  # Solo se cambian los dos puntos, las barras y los espacios.
+  # EL GUION BAJO SE CONVIERTE EN GUION NORMAL.
+  #
+  # Comprobado con dos carpetas suyas: "CLAUDE_SOFIA" quedo guardada como
+  # "CLAUDE-SOFIA" y "WEB_SOFIA" como "WEB-SOFIA". Se cambia todo lo que no sea
+  # letra o numero: los dos puntos, las barras, los espacios y el guion bajo.
+  # Las mayusculas si se respetan.
+  #
+  # Ejemplo: "C:\CLAUDE_TREBALLS\tattoo" -> "C--CLAUDE-TREBALLS-tattoo"
   $origen = Join-Path $mem "C--3D-DOCUMENTS-TATTOO"
   if (Test-Path $origen) {
-    $clave = $Raiz -replace '[^A-Za-z0-9_]', '-'
+    $clave = $Raiz -replace '[^A-Za-z0-9]', '-'
     if ($clave -ne "C--3D-DOCUMENTS-TATTOO") {
       robocopy $origen (Join-Path $claudeProj (Join-Path $clave "memory")) /E /R:1 /W:1 /NFL /NDL /NJH /NJS | Out-Null
       Write-Host "  memorias tambien como: $clave"
