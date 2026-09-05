@@ -1,0 +1,52 @@
+CALCADOR
+========
+
+Para qué sirve
+--------------
+Cuando me pasas una foto de referencia (un ornamento, una cruz, una luna) y me
+pides que la copie, yo antes dibujaba las curvas a ojo. Esta herramienta lee la
+foto y la convierte en NÚMEROS: cuántas puntas tiene, dónde están, cuánto miden,
+si es simétrica y de qué orden. Con eso el generador de mini mandalas se ajusta
+a tu referencia de verdad, no a mi ojo.
+
+Cómo lo usas tú
+---------------
+1. Guarda la foto en la carpeta  referencias\
+2. Dime el nombre del fichero.
+
+Ya está. Yo lo ejecuto.
+
+Si alguna vez lo quieres lanzar tú, abre una terminal aquí y escribe:
+
+    python trazar.py referencias\loquesea.jpg
+
+Qué deja
+--------
+En  salida\  aparecen dos ficheros por foto:
+
+  loquesea.png    la comparación. Izquierda tu foto, derecha el contorno
+                  calcado con las puntas marcadas en rosa, y abajo la curva
+                  de "hasta dónde llega la tinta en cada ángulo".
+  loquesea.json   las medidas. Esto es lo que uso yo.
+
+Qué fotos funcionan mejor
+-------------------------
+- Negro sobre blanco limpio, o blanco sobre negro. Detecta las dos.
+- Una sola forma por imagen. Si mandas una lámina con 18 ornamentos, se queda
+  con el más grande y los demás los ignora.
+- Las capturas de pantalla con halo gris alrededor salen peor que un dibujo
+  con el fondo limpio, pero funcionan.
+
+Las carpetas _pruebas\
+----------------------
+Son mías. Dentro hay cinco figuras de geometría conocida (una estrella de 8
+puntas, una cruz de 4, una gota, un borrón sin simetría) que uso para comprobar
+que la herramienta mide bien. La estrella de 8 la lee como 8, la cruz como 4, y
+al borrón le da 0.50 de simetría de espejo frente al 1.00 de los simétricos.
+Si algún día el calcador empieza a decir tonterías, se relanza sobre esas cinco
+y se ve enseguida si el fallo es suyo o de la foto.
+
+No instala nada
+---------------
+Sólo usa Python con PIL y numpy, que ya estaban en tu ordenador.
+No toca ningún fichero tuyo: lee la foto que le doy y escribe en salida\.
