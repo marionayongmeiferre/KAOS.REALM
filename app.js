@@ -2846,7 +2846,7 @@
   }
   function updateComposeButton() {
     const n = composeState.selectedIds.length;
-    if (n < 3) { composeBtn.disabled = true; selStatus.textContent = `ELIGE 3 O MÁS (LLEVAS ${n})`; }
+    if (n < 1) { composeBtn.disabled = true; selStatus.textContent = `ELIGE AL MENOS 1 (LLEVAS ${n})`; }
     else {
       composeBtn.disabled = false;
       const pages = pageBounds(n).length;
@@ -4490,7 +4490,7 @@
 
   function resetPlacements() {
     const items = currentItems();
-    if (items.length < 3) { composeState.placements = []; composeState.order = []; return; }
+    if (items.length < 1) { composeState.placements = []; composeState.order = []; return; }
     // ink coverage may not be measured yet on first paint; recompute once (one-shot)
     if (!KAOS_GALLERY.inkMeasured(items) && !composeState._inkPending) {
       composeState._inkPending = true;
@@ -4963,7 +4963,7 @@
           return;
         }
         const items = currentItems();
-        if (items.length < 3) { resolve(); return; }
+        if (items.length < 1) { resolve(); return; }
         const rs = previewScale();
         const pw = Math.round(composeState.width * rs), ph = Math.round(composeState.height * rs);
         if (composeCanvas.width !== pw || composeCanvas.height !== ph) {
