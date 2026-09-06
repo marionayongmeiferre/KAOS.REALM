@@ -345,10 +345,16 @@
     const D = getDom();
     if (!window.KAOS_APP || !KAOS_APP.previewSurrealStyle || !D.livePreviewCanvas) return;
     if (!S.elements.length) return;
-    const merged = bakeMergedCanvas();
     try {
-      const styled = await KAOS_APP.previewSurrealStyle(merged);
+      const hasResources = S.elements.some(e => e.isResource);
+      const base = hasResources ? bakeMergedCanvas("no-resources") : bakeMergedCanvas();
+      const styled = await KAOS_APP.previewSurrealStyle(base);
       if (!styled) return;
+      if (hasResources) {
+        const res = bakeMergedCanvas("resources");
+        const rctx = styled.getContext("2d");
+        rctx.drawImage(res, 0, 0, styled.width, styled.height);
+      }
       const c = D.livePreviewCanvas;
       c.width = styled.width; c.height = styled.height;
       c.getContext("2d").drawImage(styled, 0, 0);
@@ -1651,7 +1657,19 @@
       img.crossOrigin = "anonymous";
       await new Promise((resolve) => { img.onload = resolve; img.onerror = resolve; img.src = url; });
       if (!img.naturalWidth) return;
-      const maxDim = 600;
+
+      // Si hay una foto suelta en el lienzo principal y el collage esta vacio,
+      // migrarla al collage antes de anadir el diseno para que no se pierda.
+      if (!S.elements.length && window.KAOS_APP && KAOS_APP.hayImagen()) {
+        open();
+        const fotoCanvas = KAOS_APP.getFotoCanvas();
+        if (fotoCanvas) {
+          const b = await new Promise(r => fotoCanvas.toBlob(r, "image/png"));
+          if (b) await addFiles([new File([b], "foto.png", { type: "image/png" })]);
+        }
+      }
+
+      const maxDim = 1200;
       let w = img.naturalWidth, h = img.naturalHeight;
       if (url.endsWith(".svg") && (w < 50 || h < 50)) { w = maxDim; h = maxDim; }
       if (w > maxDim || h > maxDim) { const s = maxDim / Math.max(w, h); w = Math.round(w * s); h = Math.round(h * s); }

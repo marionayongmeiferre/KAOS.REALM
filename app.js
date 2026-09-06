@@ -6328,6 +6328,7 @@
     // se queda puesto haciendo de pantalla de inicio. Si la hay, el collage se
     // aparta y deja ver el dibujo.
     hayImagen: () => !!state.img,
+    getFotoCanvas: () => state.img || null,
     // Lo llama surreal.js cuando ella anade fotos con el doble clic en el
     // lienzo. Tiene que pasar por aqui y no por addFiles a secas: si ya habia
     // una foto suelta en el estilo, esta funcion la mete en el collage antes
