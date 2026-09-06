@@ -149,15 +149,46 @@
       return /ftyp(heic|heix|mif1|hevc|heim|heis|hevm|hevs)/i.test(s);
     } catch (_) { return false; }
   }
+  // Estaba dentro de fileToImage. Se saca para que lo pueda usar tambien
+  // normalizar, que es la puerta por la que entran las fotos del resto de la
+  // app: no puede haber dos maneras distintas de saber si el navegador entiende
+  // un fichero.
+  const tryDecode = (blob) => new Promise((res, rej) => {
+    const url = URL.createObjectURL(blob);
+    const im = new Image();
+    im.onload = () => res({ im, url });
+    im.onerror = () => { URL.revokeObjectURL(url); rej(new Error("decode failed")); };
+    im.src = url;
+  });
+
+  // Devuelve un fichero que el navegador SI sabe abrir.
+  //
+  // Un HEIC de iPhone no lo decodifica ni Chrome ni Edge (Safari si). Antes,
+  // soltar una foto HEIC en el lienzo principal no hacia NADA: ni cargaba ni
+  // avisaba. Aqui dentro ya habia un conversor —lo usa el escaner de libreta—,
+  // asi que se abre para que lo use tambien el resto de la app en vez de
+  // escribir otro.
+  //
+  // Si no es HEIC, o si el navegador puede solo, devuelve el mismo fichero sin
+  // tocarlo: convertir por si acaso perderia calidad a cambio de nada.
+  async function normalizar(file) {
+    if (!file) return file;
+    const looksHeic = isHeic(file) || await sniffHeic(file);
+    if (!looksHeic) return file;
+    try {
+      const r = await tryDecode(file);
+      if (r && r.url) URL.revokeObjectURL(r.url);
+      return file;                       // el navegador se apana solo
+    } catch (_) { /* hay que convertir */ }
+    if (window.KAOS_TOAST) window.KAOS_TOAST("Convirtiendo HEIC…", 6000);
+    const convert = await loadHeicConverter();   // si falla, lanza y lo cuenta quien llama
+    const jpg = await convert(file);
+    const blob = Array.isArray(jpg) ? jpg[0] : jpg;
+    const nombre = (file.name || "foto").replace(/\.(heic|heif)$/i, "") + ".jpg";
+    return new File([blob], nombre, { type: "image/jpeg", lastModified: file.lastModified || Date.now() });
+  }
+
   async function fileToImage(file) {
-    // Try the browser first (Safari handles HEIC natively — no need to convert).
-    const tryDecode = (blob) => new Promise((res, rej) => {
-      const url = URL.createObjectURL(blob);
-      const im = new Image();
-      im.onload = () => res({ im, url });
-      im.onerror = () => { URL.revokeObjectURL(url); rej(new Error("decode failed")); };
-      im.src = url;
-    });
     const looksHeic = isHeic(file) || await sniffHeic(file);
     if (!looksHeic) return tryDecode(file);
     // HEIC path — try native decode first, fall back to converter.
@@ -1127,5 +1158,5 @@
   scanExportBtn.addEventListener("click", abrirRevision);
 
   // Expose for the sidebar button in app.js
-  window.KAOS_SCAN = { open: openModal, close: closeModal };
+  window.KAOS_SCAN = { open: openModal, close: closeModal, normalizar: normalizar };
 })();

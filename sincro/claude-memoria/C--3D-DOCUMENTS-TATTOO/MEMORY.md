@@ -1,0 +1,7 @@
+- [Condiciones del estudio de tattoo](condiciones-estudio-tattoo.md) — mínimo 60 €, reparto 60/40, el estudio pone todo el material menos agujas y máquina.
+- [Memoria global manda](feedback-prioridad-memoria-global.md) — gana sobre cualquier CLAUDE.md del repositorio.
+- [Ahorrar tokens](feedback-ahorrar-tokens.md) — compactar cuando la conversación se alargue; nada de volcados largos.
+- [Permiso antes de procesar vídeo](feedback-video-permiso.md) — nunca correr ffmpeg/transcripción/subs sin confirmación explícita en chat.
+- [Content planner multi-nicho](proyecto-content-planner-multinicho.md) — objetivo: influencer de creatividad (tatuaje, arte, manualidades, escultura, joyería, pintura), no solo tatuaje.
+- [Calcador de siluetas](herramienta-calcador.md) — convierte una foto de referencia en medidas; usarlo ANTES de copiar una forma a mano.
+- [Nunca borrar diseños de la galería](feedback-nunca-borrar-galeria.md) — se perdían solos al no caber en localStorage; ahora en IndexedDB, y jamás descartar filas.

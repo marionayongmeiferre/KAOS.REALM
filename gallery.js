@@ -9,6 +9,17 @@
   // Fondo por defecto de las hojas: su foto de fondo de flash. Vive aqui dentro
   // porque el servidor solo sirve ficheros de su propia carpeta.
   const FONDO_FLASH = "uploads/fondo_flash.JPG";
+  // El letrero de neón del estudio. Es el fondo que sale en la mayoría de sus
+  // posts de tatuaje terminado, así que vive aquí como fondo de marca y no como
+  // «una foto que subió un día»: se elige por su nombre en todos los editores.
+  const FONDO_NEON = "uploads/fondo_neon.jpg";
+  // Los fondos de la marca, en un solo sitio. Quien ofrezca elegir fondo lee
+  // esta lista; así añadir uno nuevo es una línea y aparece en todas partes, en
+  // vez de tener que acordarse de tocar el reel, el flash post y lo que venga.
+  const FONDOS_MARCA = [
+    { nombre: "FLASH", src: FONDO_FLASH },
+    { nombre: "NEÓN",  src: FONDO_NEON },
+  ];
   let _bgPhotoSrc = FONDO_FLASH;
   function setBgPhoto(src) {
     if (src === _bgPhotoSrc) return;
@@ -286,6 +297,104 @@
     ctx.drawImage(srcCanvas, 0, 0, w, h);
     return c.toDataURL("image/jpeg", 0.9);
   }
+  // ------------------------------------------------------------- huella
+  //
+  // POR QUÉ EXISTE ESTO
+  //
+  // Cada diseño se identifica por un `id` que se inventa al añadirlo
+  // («g_<hora>_<azar>»). Una hoja de flash guarda los ids de los diseños que
+  // lleva. Si un diseño se borra de la galería y luego se vuelve a subir EL
+  // MISMO ARCHIVO, el id nuevo no tiene nada que ver con el viejo: para la
+  // hoja ese diseño sigue perdido aunque lo tenga delante.
+  //
+  // La huella es una firma sacada del DIBUJO, no del id: si el dibujo es el
+  // mismo, la firma es la misma, lo hayas subido hoy o el mes pasado.
+  //
+  // Cómo se hace: se encoge el diseño a 16x16 y de cada casilla se guarda
+  // cuánta tinta hay (opacidad por oscuridad), en 16 niveles. Salen 256
+  // caracteres. No es el archivo byte a byte a propósito: volver a guardar un
+  // PNG no da bytes idénticos, y entre el PC y el iPad tampoco se encogen las
+  // imágenes exactamente igual. La silueta, en cambio, aguanta.
+  const HUELLA_N = 16;
+  function huellaDe(canvas) {
+    try {
+      const c = document.createElement("canvas");
+      c.width = HUELLA_N; c.height = HUELLA_N;
+      const x = c.getContext("2d", { willReadFrequently: true });
+      x.clearRect(0, 0, HUELLA_N, HUELLA_N);
+      x.drawImage(canvas, 0, 0, HUELLA_N, HUELLA_N);
+      const d = x.getImageData(0, 0, HUELLA_N, HUELLA_N).data;
+      let s = "";
+      for (let i = 0; i < HUELLA_N * HUELLA_N; i++) {
+        const a = d[i * 4 + 3] / 255;
+        const lum = (0.2126 * d[i * 4] + 0.7152 * d[i * 4 + 1] + 0.0722 * d[i * 4 + 2]) / 255;
+        // Tinta = lo que hay dibujado: opaco y oscuro. Un diseño suyo es línea
+        // negra sobre transparente, así que esto lo describe bien.
+        const tinta = a * (1 - lum);
+        s += Math.min(15, Math.round(tinta * 15)).toString(16);
+      }
+      return s;
+    } catch (e) { return null; }
+  }
+  // Dos huellas del mismo dibujo no salen idénticas: al encoger, cada navegador
+  // redondea a su manera. Se acepta un nivel de diferencia por casilla y hasta
+  // un 8% de casillas fuera. Por debajo son el mismo dibujo; por encima, dos
+  // diseños distintos — y los suyos son muy distintos entre sí, no fotos casi
+  // iguales, así que el margen no confunde a dos vecinos.
+  function parecidas(a, b) {
+    if (!a || !b || a.length !== b.length) return false;
+    let mal = 0;
+    const tope = a.length * 0.08;
+    for (let i = 0; i < a.length; i++) {
+      if (Math.abs(parseInt(a[i], 16) - parseInt(b[i], 16)) > 1) {
+        mal++;
+        if (mal > tope) return false;
+      }
+    }
+    return true;
+  }
+  // El diseño de la galería que corresponde a esta huella, o null.
+  function buscarPorHuella(h) {
+    if (!h) return null;
+    for (const it of load()) if (it.huella && parecidas(it.huella, h)) return it;
+    return null;
+  }
+
+  // Los diseños de antes de que existiera la huella no la tienen. Se les
+  // calcula cargando su `layerUrl`, de poquito en poco: son cientos de
+  // imágenes y hacerlo del tirón dejaría la galería colgada al abrir.
+  //
+  // Se hace una vez y se guarda. A partir de ahí, si borra un diseño y vuelve
+  // a subir el mismo archivo, sus hojas lo reconocen.
+  let _firmando = null;
+  function firmarPendientes() {
+    if (_firmando) return _firmando;
+    _firmando = (async function () {
+      const items = load();
+      const faltan = items.filter((i) => i && !i.huella && i.layerUrl);
+      if (!faltan.length) return 0;
+      let hechos = 0;
+      for (const it of faltan) {
+        const img = await new Promise((res) => {
+          const im = new Image();
+          im.onload = () => res(im);
+          im.onerror = () => res(null);
+          im.src = it.layerUrl;
+        });
+        if (img) {
+          const h = huellaDe(img);
+          if (h) { it.huella = h; hechos++; }
+        }
+        // Un respiro entre diseño y diseño: con 300 en la galería, sin esto la
+        // pestaña se queda pillada un buen rato nada más abrir.
+        await new Promise((r) => setTimeout(r, 0));
+      }
+      if (hechos) save(items);
+      return hechos;
+    })();
+    return _firmando;
+  }
+
   function add(layerCanvas, opts) {
     const items = load();
     const id = "g_" + Date.now() + "_" + (Math.random() * 1e6 | 0);
@@ -300,6 +409,10 @@
       w: trimmed.width, h: trimmed.height,
       sizeCm: opts.sizeCm != null ? opts.sizeCm : 10,
       layerUrl, thumbUrl,
+      // Se saca del recorte, que es lo mismo que hay dentro de `layerUrl`: así
+      // la huella de un diseño nuevo y la de uno viejo (que se calcula
+      // cargando su `layerUrl`) salen comparables.
+      huella: huellaDe(trimmed),
     };
     items.unshift(item);
     while (items.length > MAX_ITEMS) items.pop();
@@ -1276,6 +1389,7 @@
       x += widths[i] + space;
     }
     ctx.textAlign = prev;
+    return total;
   }
   function drawCorner(ctx, x, y, sx, sy, style) {
     style = style || "ornament";
@@ -1434,6 +1548,10 @@
       ctx.save();
       ctx.translate(p.cx, p.cy);
       ctx.rotate((p.rot || 0) * Math.PI / 180);
+      // Espejo: se voltea sobre su propio centro y DESPUÉS de girar, para que
+      // girar y espejar se puedan combinar sin que uno deshaga al otro. La
+      // sombra va con la misma transformación, así que acompaña sola.
+      if (p.espejo) ctx.scale(-1, 1);
       if (shadowAmt > 0) {
         ctx.shadowColor = `rgba(0,0,0,${shadowAmt * 0.55})`;
         ctx.shadowBlur = Math.round(W * 0.012);
@@ -1557,13 +1675,26 @@
     }
 
     // Header
+    // `cajasTexto` es opcional: si quien llama pasa un objeto, se le anota
+    // dónde ha caído cada texto (en unidades de diseño) para poder pincharlo
+    // en la previa. Se apunta AL PINTAR, no en una cuenta aparte: dos cuentas
+    // separadas acaban descuadradas en cuanto cambie una tipografía. Es lo
+    // mismo que hace `piezas._cajas` en el reel.
+    const cajasTexto = opts.cajasTexto || null;
+    // Un poco de aire alrededor: la caja ceñida al píxel es incómoda de acertar
+    // con el dedo en el iPad.
+    const cajaDe = (cx, yBase, ancho, alto) => ({
+      x: cx, y: yBase - alto * 0.35, w: ancho + 24, h: alto * 1.35, rot: 0, tam: alto,
+    });
     if (hasTitle) {
       ctx.save();
       applyDecor(ctx, resolveDecor(opts.titleColor || "black", opts));
       ctx.font = fontStr(opts.titleFont || "gothic", titleSize);
       ctx.textAlign = "center";
       ctx.textBaseline = "alphabetic";
-      ctx.fillText(opts.title, W / 2, bleedPx + titleSize);
+      const yT = bleedPx + titleSize;
+      ctx.fillText(opts.title, W / 2, yT);
+      if (cajasTexto) cajasTexto.title = cajaDe(W / 2, yT, ctx.measureText(opts.title).width, titleSize);
       ctx.restore();
     }
     if (hasHandle) {
@@ -1571,7 +1702,8 @@
       applyDecor(ctx, resolveDecor(opts.handleColor || "black", opts));
       ctx.font = fontStr(opts.handleFont || "mono", handleSize);
       const y = bleedPx + (hasTitle ? titleSize * 1.20 : 0) + handleSize;
-      drawSpacedText(ctx, opts.handle, W / 2, y, 0.30);
+      const anchoH = drawSpacedText(ctx, opts.handle, W / 2, y, 0.30);
+      if (cajasTexto) cajasTexto.handle = cajaDe(W / 2, y, anchoH, handleSize);
       ctx.restore();
     }
     // Footer — centered, forced onto two rows; size and position (bottom/center/top) are tweakable,
@@ -1615,10 +1747,23 @@
       if (hasFooterTitle) {
         ctx.font = fontStr(opts.titleFont || "gothic", footerTitleSize);
         ctx.fillText(opts.footerTitle.toUpperCase(), W / 2, startY - titleGap);
+        if (cajasTexto) {
+          cajasTexto.footerTitle = cajaDe(W / 2, startY - titleGap,
+            ctx.measureText(opts.footerTitle.toUpperCase()).width, footerTitleSize);
+        }
         ctx.font = fontStr(opts.handleFont || "mono", footerSize);
       }
+      let anchoPie = 0;
       for (let i = 0; i < lines.length; i++) {
         ctx.fillText(lines[i], W / 2, startY + i * lineH);
+        anchoPie = Math.max(anchoPie, ctx.measureText(lines[i]).width);
+      }
+      if (cajasTexto) {
+        // El pie va en dos renglones: la caja los abraza a los dos, porque para
+        // ella es UN texto, no dos.
+        const alto = footerSize + (lines.length - 1) * lineH;
+        cajasTexto.footer = { x: W / 2, y: startY + ((lines.length - 1) * lineH) / 2 - footerSize * 0.35,
+                              w: anchoPie + 24, h: alto * 1.35, rot: 0, tam: footerSize };
       }
       ctx.restore();
     }
@@ -1700,7 +1845,7 @@
   root.KAOS_GALLERY = {
     FONTS,
     ensureFonts,
-    setBgPhoto, bgPhotoSrc, loadBgPhoto, FONDO_FLASH,
+    setBgPhoto, bgPhotoSrc, loadBgPhoto, FONDO_FLASH, FONDO_NEON, FONDOS_MARCA,
     pintarEtiquetasCm,
     ETIQUETAS, tags, tieneTag, toggleTag, conTag,
     load, loadRaw, save, add, remove, clear, count,
@@ -1719,9 +1864,19 @@
     trimOf,
     renderCollage,
     paintPaperSeeded,
+    // Reconocer un diseño por su dibujo y no por su id: ver el comentario de
+    // «huella», arriba.
+    huellaDe, parecidas, buscarPorHuella, firmarPendientes,
   };
 
   // Se empieza a cargar en cuanto se lee el fichero, sin esperar a que nadie la
   // pida: asi la rejilla la encuentra ya puesta.
   arrancar();
+  // Cuando la galería ya está en pie, se les calcula la huella a los diseños de
+  // antes, sin prisa y por detrás. Va tras `requestIdleCallback` para que no
+  // compita con la primera pintada, que es lo que ella está esperando ver.
+  arrancar().then(() => {
+    const luego = root.requestIdleCallback || ((f) => setTimeout(f, 1200));
+    luego(() => { firmarPendientes().catch(() => {}); });
+  }).catch(() => {});
 })(window);

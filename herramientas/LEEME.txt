@@ -1,0 +1,30 @@
+HERRAMIENTAS QUE VIAJAN CON EL REPOSITORIO
+==========================================
+
+Aqui dentro va lo que NO es codigo de la app pero hace falta en cualquier
+ordenador donde trabajes. Estan aqui, y no cada una en su propio repositorio,
+por una razon practica: asi llegan solas al clonar este, sin tener que crear
+repositorios nuevos ni acordarse de copiar nada.
+
+
+CALCADOR
+--------
+Convierte una foto de referencia en medidas: contorno real, hasta donde llega
+la tinta en cada angulo, orden de simetria y simetria de espejo. Sirve para
+copiar una silueta sin dibujarla a ojo.
+
+    cd herramientas\CALCADOR
+    python trazar.py referencias\Cruz\lo-que-sea.jpg
+
+Deja en `salida\` un .json con las medidas y un .png de comparacion.
+
+La carpeta `salida\` NO viaja: son 181 ficheros y 7,4 MB de resultados que se
+rehacen ejecutandolo otra vez. La primera vez que lo uses se crea sola.
+
+Las fotos de `referencias\_pruebas\` son cinco figuras de geometria conocida
+(estrella de 8, cruz de 4, borron asimetrico...). Si el calcador empieza a dar
+resultados raros, se relanza sobre esas cinco: si las acierta, el problema esta
+en la foto nueva y no en la herramienta.
+
+El original sigue en "C:\3D DOCUMENTS\TATTOO\CALCADOR" en el ordenador de casa,
+con toda su carpeta `salida`. Esto de aqui es la copia que viaja.

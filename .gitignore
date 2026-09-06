@@ -17,3 +17,6 @@ node_modules/
 venv/
 Thumbs.db
 .DS_Store
+
+# Resultados del calcador: se rehacen ejecutandolo. 181 ficheros, 7,4 MB.
+herramientas/CALCADOR/salida/
