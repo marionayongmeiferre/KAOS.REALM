@@ -2282,7 +2282,7 @@ input[type="file"] { display: none; }
   .control{margin-bottom:18px}
   .control input[type="range"]{height:34px}
   .control input[type="range"]::-webkit-slider-thumb{width:26px;height:26px;box-shadow:0 0 0 1px var(--bone),0 2px 6px rgba(0,0,0,0.6)}
-  .tog,.icon-btn,.style-btn,.btn{min-height:44px}
+  .tog,.icon-btn,.style-btn,.btn,.lz{min-height:44px}
   .bg-toggle{min-height:44px;display:flex;align-items:center;gap:10px}
   .font-pick{min-height:44px}
   .toolbar .icon-btn{min-height:40px}
@@ -3872,7 +3872,7 @@ input[type="file"] { display: none; }
    utiles: casi un 10 % de su sitio para navegar a otro sitio. Vuelve a una
    fila, con el texto mas grande que al principio y menos aire entre letras,
    que es lo que la desbordaba. */
-.lanzador { display: flex; flex-wrap: nowrap; gap: 3px; }
+.lanzador { display: flex; flex-wrap: nowrap; gap: 3px; overflow-x: auto; -webkit-overflow-scrolling: touch; }
 .lz { font-size: 9px; letter-spacing: 0.02em; padding: 8px 3px; }
 
 /* El subrayado de la pestaña salia como un borron rojo. Un trazo se lee

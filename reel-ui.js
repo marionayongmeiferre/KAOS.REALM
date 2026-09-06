@@ -7,7 +7,14 @@
 
   const REEL = root.KAOS_REEL;
   const GAL = root.KAOS_GALLERY;
-  if (!REEL || !GAL) { console.warn("reel-ui: falta reel.js o gallery.js"); return; }
+  if (!REEL || !GAL) {
+    console.warn("reel-ui: falta reel.js o gallery.js");
+    var btn = document.querySelector("#reelOpenBtn");
+    if (btn) btn.addEventListener("click", function () {
+      alert("El módulo del reel no se ha cargado. Recarga la página.");
+    });
+    return;
+  }
 
   const $ = (s) => document.querySelector(s);
   const D = {
