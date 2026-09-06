@@ -1023,6 +1023,22 @@
           S.ctx.rect(x - sq / 2, y - sq / 2, sq, sq);
           S.ctx.fill(); S.ctx.stroke();
         }
+        // delete handle — circle with ✕
+        const { del } = elementHandlePoints(e);
+        const dr = 10 * ds;
+        S.ctx.fillStyle = "#c9342a";
+        S.ctx.strokeStyle = "#fff";
+        S.ctx.lineWidth = 2 * ds;
+        S.ctx.beginPath();
+        S.ctx.arc(del[0], del[1], dr, 0, Math.PI * 2);
+        S.ctx.fill(); S.ctx.stroke();
+        const cx = del[0], cy = del[1], cr = 4 * ds;
+        S.ctx.strokeStyle = "#fff";
+        S.ctx.lineWidth = 2.5 * ds;
+        S.ctx.beginPath();
+        S.ctx.moveTo(cx - cr, cy - cr); S.ctx.lineTo(cx + cr, cy + cr);
+        S.ctx.moveTo(cx + cr, cy - cr); S.ctx.lineTo(cx - cr, cy + cr);
+        S.ctx.stroke();
         S.ctx.restore();
       }
     }
@@ -1275,6 +1291,7 @@
     return {
       corners: [[-hw, -hh], [hw, -hh], [hw, hh], [-hw, hh]],
       rotate: [0, -hh - armLen],
+      del: [hw + 18 * ds, -hh - 18 * ds],
       hw, hh, ds,
     };
   }
@@ -1286,9 +1303,10 @@
   }
   // Returns {type:"rotate"} or {type:"scale", corner} if the pointer is over a handle.
   function handleAt(e, mx, my) {
-    const { corners, rotate, ds } = elementHandlePoints(e);
+    const { corners, rotate, del, ds } = elementHandlePoints(e);
     const [lx, ly] = boxLocalPoint(e, mx, my);
     const tol = 13 * ds;
+    if (Math.hypot(lx - del[0], ly - del[1]) <= tol) return { type: "delete" };
     if (Math.hypot(lx - rotate[0], ly - rotate[1]) <= tol) return { type: "rotate" };
     for (let i = 0; i < corners.length; i++) {
       if (Math.hypot(lx - corners[i][0], ly - corners[i][1]) <= tol) return { type: "scale", corner: i };
@@ -1338,6 +1356,15 @@
         const sel = S.elements[S.selectedIdx];
         const h = sel ? handleAt(sel, mx, my) : null;
         if (h) {
+          if (h.type === "delete") {
+            pushSurrealUndo();
+            const idx = S.selectedIdx;
+            S.elements.splice(idx, 1);
+            S.order = S.order.filter(x => x !== idx).map(x => (x > idx ? x - 1 : x));
+            S.selectedIdx = null;
+            repintarTodo();
+            return;
+          }
           if (h.type === "rotate") {
             const ang = Math.atan2(my - sel.cy, mx - sel.cx) * 180 / Math.PI;
             S.drag = { mode: "rotate", idx: S.selectedIdx, startAng: ang, startRot: sel.rot };
@@ -1391,7 +1418,7 @@
           const [hx, hy] = canvasXY(ev);
           const sel = S.elements[S.selectedIdx];
           const h = sel ? handleAt(sel, hx, hy) : null;
-          D.canvas.style.cursor = h ? (h.type === "rotate" ? "grab" : "nwse-resize") : "default";
+          D.canvas.style.cursor = h ? (h.type === "rotate" ? "grab" : h.type === "delete" ? "pointer" : "nwse-resize") : "default";
         }
         return;
       }
