@@ -32,7 +32,13 @@ $ErrorActionPreference = "Continue"
 # Asi funciona igual en "C:\3D DOCUMENTS\TATTOO" que en "C:\CLAUDE_TREBALLS" o
 # donde sea, sin tocar una linea.
 $Raiz = Split-Path $PSScriptRoot -Parent
-$Flash = Join-Path $Raiz "TATTOO_FLASH_CREATOR"
+# La carpeta del flash creator es LA QUE CONTIENE ESTE SCRIPT, se llame como
+# se llame. En un ordenador es "TATTOO_FLASH_CREATOR" y en otro "KAOS.REALM",
+# porque el repositorio en GitHub se llama KAOS.REALM y al clonarlo sin
+# renombrar sale con ese nombre. Escribirlo a mano rompia el script en el
+# ordenador donde no coincidiera.
+$Flash = $PSScriptRoot
+$NombreFlash = Split-Path $Flash -Leaf
 
 Write-Host ""
 Write-Host "=== PREPARANDO LO QUE NO ES CODIGO ==="
@@ -86,7 +92,8 @@ if (Test-Path $normas) {
 }
 
 # --- subir cada repositorio ----------------------------------------------
-$repos = @("TATTOO_FLASH_CREATOR", "AI_TATTOO_POST_EDIT", "AI_CONTENT_PLANNER", "AI_REEL_EDITOR")
+# El primero es la carpeta donde vive este script, se llame como se llame.
+$repos = @($NombreFlash, "AI_TATTOO_POST_EDIT", "AI_CONTENT_PLANNER", "AI_REEL_EDITOR")
 $fecha = Get-Date -Format "yyyy-MM-dd HH:mm"
 
 Write-Host ""

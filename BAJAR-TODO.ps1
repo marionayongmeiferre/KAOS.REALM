@@ -38,12 +38,21 @@ $ErrorActionPreference = "Continue"
 # Asi funciona igual en "C:\3D DOCUMENTS\TATTOO" que en "C:\CLAUDE_TREBALLS" o
 # donde sea, sin tocar una linea.
 $Raiz = Split-Path $PSScriptRoot -Parent
-$Flash = Join-Path $Raiz "TATTOO_FLASH_CREATOR"
+# La carpeta del flash creator es LA QUE CONTIENE ESTE SCRIPT, se llame como
+# se llame. En un ordenador es "TATTOO_FLASH_CREATOR" y en otro "KAOS.REALM",
+# porque el repositorio en GitHub se llama KAOS.REALM y al clonarlo sin
+# renombrar sale con ese nombre. Escribirlo a mano rompia el script en el
+# ordenador donde no coincidiera.
+$Flash = $PSScriptRoot
+$NombreFlash = Split-Path $Flash -Leaf
 
 # Nombre de carpeta -> repositorio. Los nombres de carpeta IMPORTAN: hay codigo
 # y notas que los nombran tal cual.
 $Repos = [ordered]@{
-  "TATTOO_FLASH_CREATOR" = "https://github.com/marionayongmeiferre/KAOS.REALM.git"
+  # La clave es el nombre REAL de la carpeta donde esta este script. Si clonaste
+  # sin renombrar, se llama "KAOS.REALM"; si renombraste, "TATTOO_FLASH_CREATOR".
+  # Las dos valen: la app usa rutas relativas y le da igual como se llame.
+  $NombreFlash           = "https://github.com/marionayongmeiferre/KAOS.REALM.git"
   "AI_TATTOO_POST_EDIT"  = "https://github.com/marionayongmeiferre/AI_TATTOO_POST_EDIT.git"
   "AI_CONTENT_PLANNER"   = "https://github.com/marionayongmeiferre/AI-content-planner-app.git"
   "AI_REEL_EDITOR"       = "https://github.com/marionayongmeiferre/AI-VIDEO-EDITOR.git"
