@@ -28,3 +28,24 @@ en la foto nueva y no en la herramienta.
 
 El original sigue en "C:\3D DOCUMENTS\TATTOO\CALCADOR" en el ordenador de casa,
 con toda su carpeta `salida`. Esto de aqui es la copia que viaja.
+
+
+CALCULADORA DE PRECIOS
+----------------------
+cm -> horas -> euros, con el reparto del estudio, el minimo y lo que se le
+cobra a la clienta.
+
+Se abre haciendo doble clic en `calculadora-precios-tattoo.html`. No necesita
+servidor ni nada instalado.
+
+AQUI NO HAY UN precio.js, y es a proposito. La formula y las tarifas viven en
+`TATTOO_FLASH_CREATOR\precio.js` (dos carpetas mas arriba) y esta calculadora
+lo carga de ahi. Su norma es que un precio no se duplica nunca: dos copias
+acaban descuadradas y entonces cobra una cosa el flash y otra la calculadora.
+Ya hay dos copias sancionadas —la maestra de la carpeta madre y la del flash
+creator, que corre en su propio servidor y no puede leer fuera de su carpeta—;
+una tercera aqui sobraba.
+
+Lo que NO esta en precio.js, tambien a proposito: IVA, cuota, IRPF y neto. Eso
+es cuenta suya y solo tiene sentido dentro de la calculadora; el flash solo
+enseña lo que se le cobra a la clienta.

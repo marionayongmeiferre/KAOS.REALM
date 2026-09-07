@@ -1,0 +1,964 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Calculadora de precios · Tattoo</title>
+<style>
+  *,*::before,*::after{box-sizing:border-box}
+  :root{
+    --bg:#0c0c0e; --panel:#151519; --panel2:#1b1b21; --line:#2a2a33;
+    --txt:#eae7e3; --dim:#8f8b86; --dim2:#5f5c58;
+    --ink:#e0483c; --gold:#d9a441; --good:#4caf7d; --warn:#e0a33c; --bad:#d9483c;
+    --r:12px;
+  }
+  html,body{margin:0;padding:0}
+  body{
+    background:var(--bg); color:var(--txt);
+    font:15px/1.5 ui-sans-serif,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    -webkit-font-smoothing:antialiased; padding-bottom:60px;
+  }
+  .wrap{max-width:1220px;margin:0 auto;padding:22px 16px}
+
+  header.top{
+    display:flex;align-items:baseline;gap:14px;flex-wrap:wrap;
+    padding-bottom:16px;margin-bottom:22px;border-bottom:1px solid var(--line);
+  }
+  header.top h1{
+    margin:0;font-size:20px;font-weight:650;letter-spacing:-.01em;
+  }
+  header.top h1 span{color:var(--ink)}
+  header.top .sub{color:var(--dim);font-size:13px}
+  .reset{
+    margin-left:auto;background:none;border:1px solid var(--line);color:var(--dim);
+    padding:6px 12px;border-radius:8px;font-size:12.5px;cursor:pointer;font-family:inherit;
+  }
+  .reset:hover{border-color:var(--ink);color:var(--txt)}
+
+  .layout{display:grid;grid-template-columns:minmax(0,1fr) 372px;gap:22px;align-items:start}
+  @media (max-width:940px){ .layout{grid-template-columns:1fr} }
+
+  /* ---- cards ---- */
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:var(--r);margin-bottom:16px;overflow:hidden}
+  .card > summary{
+    list-style:none;cursor:pointer;padding:14px 16px;display:flex;align-items:center;gap:10px;
+    font-weight:600;font-size:14px;letter-spacing:.01em;user-select:none;
+  }
+  .card > summary::-webkit-details-marker{display:none}
+  .card > summary::after{content:"+";margin-left:auto;color:var(--dim2);font-size:17px;line-height:1}
+  .card[open] > summary::after{content:"−"}
+  .card > summary .n{
+    width:22px;height:22px;flex:none;border-radius:6px;background:var(--panel2);
+    color:var(--ink);font-size:11px;font-weight:700;display:grid;place-items:center;
+  }
+  .card > summary:hover{background:var(--panel2)}
+  .body{padding:4px 16px 18px}
+
+  /* ---- fields ---- */
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+  .grid3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px}
+  @media (max-width:560px){ .grid2,.grid3{grid-template-columns:1fr} }
+  .f{margin:12px 0 0}
+  .f > label{display:block;font-size:12px;color:var(--dim);margin-bottom:5px;letter-spacing:.02em}
+  input[type=number],input[type=text],select{
+    width:100%;background:var(--panel2);border:1px solid var(--line);color:var(--txt);
+    padding:9px 10px;border-radius:8px;font:inherit;font-size:14px;
+  }
+  input:focus,select:focus{outline:none;border-color:var(--ink)}
+  select{appearance:none;background-image:linear-gradient(45deg,transparent 50%,var(--dim) 50%),linear-gradient(135deg,var(--dim) 50%,transparent 50%);
+    background-position:calc(100% - 15px) 50%,calc(100% - 10px) 50%;background-size:5px 5px,5px 5px;background-repeat:no-repeat;padding-right:30px}
+  .suffix{position:relative}
+  .suffix input{padding-right:38px}
+  .suffix i{position:absolute;right:11px;top:50%;transform:translateY(-50%);font-style:normal;color:var(--dim2);font-size:12px;pointer-events:none}
+
+  .rangef .rhead{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:6px}
+  .rangef .rhead b{font-size:13px;font-weight:600;color:var(--txt);font-variant-numeric:tabular-nums}
+  input[type=range]{
+    -webkit-appearance:none;appearance:none;width:100%;height:22px;background:transparent;cursor:pointer;margin:0;display:block;
+  }
+  input[type=range]::-webkit-slider-runnable-track{height:3px;background:var(--line);border-radius:3px}
+  input[type=range]::-moz-range-track{height:3px;background:var(--line);border-radius:3px}
+  input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:16px;height:16px;border-radius:50%;background:var(--ink);margin-top:-6.5px;border:0}
+  input[type=range]::-moz-range-thumb{width:16px;height:16px;border-radius:50%;background:var(--ink);border:0}
+  .ticks{display:flex;justify-content:space-between;font-size:10.5px;color:var(--dim2);margin-top:-2px}
+
+  .chk{display:flex;align-items:center;gap:9px;padding:9px 0;font-size:13.5px;color:var(--txt);cursor:pointer}
+  .chk input{accent-color:var(--ink);width:16px;height:16px;flex:none;cursor:pointer}
+  .hint{font-size:11.5px;color:var(--dim2);margin-top:5px;line-height:1.45}
+  .divider{height:1px;background:var(--line);margin:18px 0 4px}
+  .subhead{font-size:11px;text-transform:uppercase;letter-spacing:.09em;color:var(--dim2);margin:18px 0 -2px;font-weight:650}
+
+  /* ---- result ---- */
+  .sticky{position:sticky;top:16px}
+  @media (max-width:940px){ .sticky{position:static} }
+  .res{background:linear-gradient(175deg,#1c1c22,#141418);border:1px solid var(--line);border-radius:var(--r);overflow:hidden}
+  .res .head{padding:20px 18px 18px;border-bottom:1px solid var(--line);text-align:center}
+  .res .lbl{font-size:11px;text-transform:uppercase;letter-spacing:.11em;color:var(--dim);margin-bottom:9px}
+  .price{font-size:46px;font-weight:700;letter-spacing:-.03em;line-height:1;font-variant-numeric:tabular-nums}
+  .price em{font-style:normal;font-size:24px;color:var(--dim);font-weight:500;margin-left:2px}
+  .band{font-size:12.5px;color:var(--dim);margin-top:9px;font-variant-numeric:tabular-nums}
+  .minflag{
+    display:inline-block;margin-top:10px;font-size:10.5px;letter-spacing:.06em;text-transform:uppercase;
+    background:rgba(217,164,65,.13);color:var(--gold);border:1px solid rgba(217,164,65,.3);
+    padding:3px 9px;border-radius:20px;
+  }
+  .kpis{display:grid;grid-template-columns:1fr 1fr 1fr;border-bottom:1px solid var(--line)}
+  .kpi{padding:13px 8px;text-align:center;border-right:1px solid var(--line)}
+  .kpi:last-child{border-right:0}
+  .kpi b{display:block;font-size:17px;font-weight:650;font-variant-numeric:tabular-nums}
+  .kpi span{font-size:10.5px;color:var(--dim);letter-spacing:.03em}
+
+  .sect{padding:15px 18px;border-bottom:1px solid var(--line)}
+  .sect:last-child{border-bottom:0}
+  .sect h4{margin:0 0 11px;font-size:10.5px;text-transform:uppercase;letter-spacing:.1em;color:var(--dim2);font-weight:650}
+  .row{display:flex;justify-content:space-between;gap:12px;font-size:13px;padding:4px 0;font-variant-numeric:tabular-nums}
+  .row span{color:var(--dim);min-width:0}
+  .row b{font-weight:550;white-space:nowrap}
+  .row.neg b{color:#c9736a}
+  .row.tot{border-top:1px solid var(--line);margin-top:8px;padding-top:9px;font-size:14.5px}
+  .row.tot span{color:var(--txt);font-weight:600}
+  .row.tot b{font-weight:700;font-size:16px}
+
+  .verdict{padding:14px 18px;display:flex;gap:11px;align-items:flex-start;font-size:12.5px;line-height:1.5}
+  .dot{width:9px;height:9px;border-radius:50%;flex:none;margin-top:5px}
+  .verdict strong{display:block;font-size:13px;margin-bottom:2px}
+  .g{color:var(--good)} .w{color:var(--warn)} .b{color:var(--bad)}
+  .dot.g{background:var(--good)} .dot.w{background:var(--warn)} .dot.b{background:var(--bad)}
+
+  /* ---- jornada ---- */
+  .addbtn{
+    width:100%;background:var(--ink);border:0;color:#fff;padding:11px;border-radius:9px;
+    font:inherit;font-size:13.5px;font-weight:600;cursor:pointer;letter-spacing:.01em;
+  }
+  .addbtn:hover{filter:brightness(1.1)}
+  .addbtn:active{transform:translateY(1px)}
+  .dayhead{
+    display:flex;align-items:center;gap:10px;padding:14px 18px;border-bottom:1px solid var(--line);
+    font-size:11px;text-transform:uppercase;letter-spacing:.1em;color:var(--gold);font-weight:650;
+  }
+  .clearbtn{
+    margin-left:auto;background:none;border:1px solid var(--line);color:var(--dim);
+    padding:4px 10px;border-radius:7px;font:inherit;font-size:10.5px;cursor:pointer;
+    text-transform:uppercase;letter-spacing:.06em;
+  }
+  .clearbtn:hover{border-color:var(--bad);color:var(--txt)}
+  .pz{display:flex;align-items:center;gap:10px;padding:11px 18px;border-bottom:1px solid var(--line);font-size:12.5px}
+  .pz .idx{
+    width:19px;height:19px;flex:none;border-radius:5px;background:var(--panel2);
+    color:var(--dim);font-size:10.5px;font-weight:700;display:grid;place-items:center;
+  }
+  .pz .info{min-width:0;flex:1}
+  .pz .nm{display:block;color:var(--txt);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .pz .meta{display:block;color:var(--dim2);font-size:11px;margin-top:1px}
+  .pz .pv{font-variant-numeric:tabular-nums;color:var(--dim);white-space:nowrap}
+  .pz .del{
+    background:none;border:0;color:var(--dim2);cursor:pointer;font-size:17px;line-height:1;
+    padding:0 2px;flex:none;font-family:inherit;
+  }
+  .pz .del:hover{color:var(--bad)}
+  .row.save b{color:var(--good)}
+
+  footer.note{margin-top:26px;padding-top:16px;border-top:1px solid var(--line);color:var(--dim2);font-size:11.5px;line-height:1.6}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header class="top">
+  <h1>Calculadora de precios <span>·</span> Tattoo</h1>
+  <div class="sub">Barcelona · reparto 60/40 · vista interna</div>
+  <button class="reset" id="reset">Restablecer</button>
+</header>
+
+<div class="layout">
+
+  <!-- ============ COLUMNA IZQUIERDA: INPUTS ============ -->
+  <div>
+
+    <!-- 1. PIEZA -->
+    <details class="card" open>
+      <summary><i class="n">1</i> La pieza</summary>
+      <div class="body">
+
+        <div class="grid3">
+          <div class="f"><label>Ancho</label><div class="suffix"><input type="number" id="w" min="1" step="0.5"><i>cm</i></div></div>
+          <div class="f"><label>Alto</label><div class="suffix"><input type="number" id="h" min="1" step="0.5"><i>cm</i></div></div>
+          <div class="f"><label>Ocupación del área</label>
+            <select id="dens">
+              <option value="0.85">Compacta / maciza</option>
+              <option value="0.6">Media</option>
+              <option value="0.4">Dispersa / lineal</option>
+            </select>
+          </div>
+        </div>
+        <div class="hint" id="areaHint"></div>
+
+        <div class="f"><label>Estilo</label><select id="estilo"></select></div>
+
+        <div class="f rangef">
+          <div class="rhead"><label style="margin:0">Nivel de detalle</label><b id="detLbl"></b></div>
+          <input type="range" id="det" min="1" max="5" step="1">
+          <div class="ticks"><span>Muy simple</span><span>Medio</span><span>Extremo</span></div>
+        </div>
+
+        <div class="grid2">
+          <div class="f"><label>Color</label>
+            <select id="color">
+              <option value="1.0">Solo negro</option>
+              <option value="1.1">Negro y grises (B&amp;G)</option>
+              <option value="1.25">Color parcial</option>
+              <option value="1.45">Full color</option>
+            </select>
+          </div>
+          <div class="f"><label>Relleno / saturación</label>
+            <select id="fill">
+              <option value="0.85">Solo línea</option>
+              <option value="1.0">Relleno parcial</option>
+              <option value="1.3">Sólido / saturado</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="f"><label>Zona del cuerpo</label><select id="zona"></select></div>
+
+        <div class="grid2">
+          <div class="f"><label>Tipo de piel</label>
+            <select id="piel">
+              <option value="1.0">Normal</option>
+              <option value="1.15">Fina / madura</option>
+              <option value="1.3">Cicatriz / estrías</option>
+            </select>
+          </div>
+          <div class="f"><label>Cover-up</label>
+            <select id="cover">
+              <option value="1.0">No</option>
+              <option value="1.3">Sobre tattoo claro</option>
+              <option value="1.6">Sobre tattoo saturado</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="divider"></div>
+
+        <div class="f rangef">
+          <div class="rhead"><label style="margin:0">Ajuste manual (tu instinto manda)</label><b id="adjLbl"></b></div>
+          <input type="range" id="adj" min="-40" max="40" step="5">
+          <div class="ticks"><span>−40%</span><span>0</span><span>+40%</span></div>
+          <div class="hint">Si la estimación no te cuadra, corrígela aquí. Afecta a las horas, no al precio directamente.</div>
+        </div>
+
+      </div>
+    </details>
+
+    <!-- 2. DISEÑO -->
+    <details class="card" open>
+      <summary><i class="n">2</i> El diseño</summary>
+      <div class="body">
+        <div class="f"><label>Origen del diseño</label>
+          <select id="dis">
+            <option value="cliente">Lo trae el cliente tal cual</option>
+            <option value="clienteadapt">Lo trae el cliente, pero hay que redibujarlo</option>
+            <option value="flash">Flash propio (ya dibujado)</option>
+            <option value="adapt">Flash adaptado al cliente</option>
+            <option value="custom">Custom desde cero</option>
+            <option value="custom2">Custom complejo / varias propuestas</option>
+          </select>
+        </div>
+        <div id="disBox">
+          <div class="grid2">
+            <div class="f rangef">
+              <div class="rhead"><label style="margin:0">Horas de diseño</label><b id="dpctLbl"></b></div>
+              <input type="range" id="dpct" min="0" max="60" step="5">
+              <div class="hint">% sobre las horas de tatuaje.</div>
+            </div>
+            <div class="f rangef">
+              <div class="rhead"><label style="margin:0">Se cobra al</label><b id="drateLbl"></b></div>
+              <input type="range" id="drate" min="0" max="100" step="10">
+              <div class="hint">% de tu tarifa/hora. 0% = diseño regalado.</div>
+            </div>
+          </div>
+        </div>
+        <div class="hint" id="disHint"></div>
+      </div>
+    </details>
+
+    <!-- 3. TARIFA -->
+    <details class="card" open>
+      <summary><i class="n">3</i> Tu tarifa y el estudio</summary>
+      <div class="body">
+
+        <div class="f"><label>Tu nivel</label>
+          <select id="nivel">
+            <option value="38">Aprendiz — 30-45 €/h</option>
+            <option value="65">Junior (1-3 años) — 55-75 €/h</option>
+            <option value="95">Establecida (3-8 años) — 85-105 €/h</option>
+            <option value="125">Senior / resident — 115-140 €/h</option>
+            <option value="190">Reconocida / guest — 160-250 €/h</option>
+            <option value="0">Personalizada</option>
+          </select>
+        </div>
+
+        <div class="grid2">
+          <div class="f"><label>Tarifa por hora</label><div class="suffix"><input type="number" id="rate" min="0" step="5"><i>€</i></div></div>
+          <div class="f"><label>Mínimo del estudio</label><div class="suffix"><input type="number" id="min" min="0" step="5"><i>€</i></div></div>
+        </div>
+
+        <div class="grid2">
+          <div class="f"><label>Tu % del reparto</label><div class="suffix"><input type="number" id="split" min="0" max="100" step="5"><i>%</i></div></div>
+          <div class="f"><label>Máx. horas por sesión</label><div class="suffix"><input type="number" id="maxses" min="1" max="12" step="0.5"><i>h</i></div></div>
+        </div>
+
+        <label class="chk"><input type="checkbox" id="urg"> Hueco urgente / fuera de horario <span style="color:var(--dim2)">(+15%)</span></label>
+
+        <div class="subhead">Reparto e IVA</div>
+        <div class="f"><label>El 60/40 se calcula sobre</label>
+          <select id="splitbase">
+            <option value="neto">La base sin IVA</option>
+            <option value="bruto">El total cobrado al cliente</option>
+          </select>
+        </div>
+        <div class="grid2">
+          <div class="f"><label>IVA</label><div class="suffix"><input type="number" id="iva" min="0" max="30" step="1"><i>%</i></div></div>
+          <div class="f"><label>El precio que doy al cliente</label>
+            <select id="ivamode">
+              <option value="inc">Lleva el IVA incluido</option>
+              <option value="exc">Es sin IVA (se suma aparte)</option>
+            </select>
+          </div>
+        </div>
+
+      </div>
+    </details>
+
+    <!-- 4. MATERIAL -->
+    <details class="card">
+      <summary><i class="n">4</i> Material a tu cargo</summary>
+      <div class="body">
+        <div class="hint" style="margin-top:12px">El estudio pone guantes, film, tintas, transfer y aftercare. Tú pones agujas y máquina, así que solo eso resta de tu neto.</div>
+
+        <div class="subhead">Agujas / cartuchos</div>
+        <div class="grid2">
+          <div class="f"><label>Cartuchos estimados</label><div class="suffix"><input type="number" id="cart" min="0" step="1"><i>ud</i></div></div>
+          <div class="f"><label>Precio por cartucho</label><div class="suffix"><input type="number" id="cartp" min="0" step="0.1"><i>€</i></div></div>
+        </div>
+        <label class="chk"><input type="checkbox" id="cartauto" checked> Calcular cartuchos automáticamente</label>
+        <div class="hint" id="cartHint"></div>
+
+        <div class="subhead">Máquina (amortización)</div>
+        <div class="grid3">
+          <div class="f"><label>Precio del equipo</label><div class="suffix"><input type="number" id="maqp" min="0" step="50"><i>€</i></div></div>
+          <div class="f"><label>Vida útil</label><div class="suffix"><input type="number" id="maqv" min="1" step="1"><i>años</i></div></div>
+          <div class="f"><label>Horas tatuando/mes</label><div class="suffix"><input type="number" id="hmes" min="1" step="5"><i>h</i></div></div>
+        </div>
+        <div class="hint" id="maqHint"></div>
+
+        <div class="f"><label>Otros gastos tuyos por sesión (opcional)</label><div class="suffix"><input type="number" id="otro" min="0" step="1"><i>€</i></div></div>
+        <div class="hint">Desplazamiento, parking, algún consumible que pongas tú.</div>
+      </div>
+    </details>
+
+    <!-- 5. VARIAS PIEZAS -->
+    <details class="card">
+      <summary><i class="n">5</i> Varias piezas el mismo día</summary>
+      <div class="body">
+        <div class="hint" style="margin-top:12px">
+          Hacer dos o tres tatuajes en la misma jornada sale más barato por dos motivos reales:
+          el <b>mínimo de estudio se aplica una vez al día</b> (no por pieza) y te ahorras
+          el montaje repetido — preparar puesto, plantilla, guantes, limpieza y papeleo.
+        </div>
+
+        <div class="f rangef">
+          <div class="rhead"><label style="margin:0">Montaje que te ahorras por pieza extra</label><b id="setLbl"></b></div>
+          <input type="range" id="setup" min="0" max="60" step="5">
+          <div class="ticks"><span>0 min</span><span>30 min</span><span>60 min</span></div>
+          <div class="hint">Tiempo de preparación que no repites en la segunda pieza y siguientes.</div>
+        </div>
+
+        <div class="f rangef">
+          <div class="rhead"><label style="margin:0">Mínimo para las piezas extra</label><b id="mexLbl"></b></div>
+          <input type="range" id="minextra" min="30" max="100" step="5">
+          <div class="ticks"><span>30%</span><span>65%</span><span>100%</span></div>
+          <div class="hint">La primera pieza paga el mínimo entero; las siguientes, este porcentaje. Al 100% no hay ahorro por compartir mínimo.</div>
+        </div>
+
+        <div class="f rangef">
+          <div class="rhead"><label style="margin:0">Descuento comercial extra</label><b id="dtoLbl"></b></div>
+          <input type="range" id="dto" min="0" max="20" step="1">
+          <div class="ticks"><span>0%</span><span>10%</span><span>20%</span></div>
+          <div class="hint">Rebaja voluntaria sobre el total del día, además del ahorro de montaje. Déjalo en 0 si no quieres regalar nada.</div>
+        </div>
+
+        <div class="f"><label>A partir de cuántas piezas se aplica el descuento</label>
+          <select id="dtodesde">
+            <option value="2">2 piezas</option>
+            <option value="3">3 piezas</option>
+            <option value="4">4 piezas</option>
+          </select>
+        </div>
+
+        <div class="hint" style="margin-top:14px;color:var(--dim)">
+          Configura la pieza arriba y pulsa <b>«Añadir a la jornada»</b> en el panel de resultado.
+          Repite para cada tatuaje del día y verás el total conjunto con el ahorro aplicado.
+        </div>
+      </div>
+    </details>
+
+    <!-- 6. FISCAL -->
+    <details class="card">
+      <summary><i class="n">6</i> Autónomo y gastos fijos</summary>
+      <div class="body">
+
+        <div class="f"><label>Cuota de autónomo</label>
+          <select id="cuotasel">
+            <option value="90">Tarifa plana (primer año) — 90 €/mes</option>
+            <option value="230">Tramo bajo — 230 €/mes</option>
+            <option value="320">Tramo medio — 320 €/mes</option>
+            <option value="450">Tramo alto — 450 €/mes</option>
+            <option value="0">Personalizada</option>
+          </select>
+        </div>
+
+        <div class="grid2">
+          <div class="f"><label>Cuota mensual</label><div class="suffix"><input type="number" id="cuota" min="0" step="10"><i>€</i></div></div>
+          <div class="f"><label>Gastos fijos mensuales</label><div class="suffix"><input type="number" id="fijos" min="0" step="10"><i>€</i></div></div>
+        </div>
+        <div class="hint">Gastos fijos: gestoría, seguro de responsabilidad civil, móvil, web, transporte, formación… Todo lo que pagas cada mes trabajes o no.</div>
+
+        <div class="grid2">
+          <div class="f"><label>IRPF estimado</label><div class="suffix"><input type="number" id="irpf" min="0" max="50" step="1"><i>%</i></div></div>
+          <div class="f"><label>Objetivo neto por hora</label><div class="suffix"><input type="number" id="obj" min="0" step="5"><i>€</i></div></div>
+        </div>
+        <div class="hint">El objetivo es lo que quieres ganar limpio por hora tatuando. Se usa para el semáforo.</div>
+
+        <div class="f"><label>Depósito / señal para reservar</label><div class="suffix"><input type="number" id="dep" min="0" max="100" step="5"><i>%</i></div></div>
+      </div>
+    </details>
+
+  </div>
+
+  <!-- ============ COLUMNA DERECHA: RESULTADO ============ -->
+  <div class="sticky">
+    <div class="res">
+
+      <div class="head">
+        <div class="lbl">Precio al cliente</div>
+        <div class="price" id="pPrice">—</div>
+        <div class="band" id="pBand"></div>
+        <div id="pMin"></div>
+      </div>
+
+      <div class="kpis">
+        <div class="kpi"><b id="kHoras">—</b><span>horas</span></div>
+        <div class="kpi"><b id="kSes">—</b><span>sesiones</span></div>
+        <div class="kpi"><b id="kDep">—</b><span>depósito</span></div>
+      </div>
+
+      <div class="sect">
+        <h4>Cómo sale el precio</h4>
+        <div id="brkPrice"></div>
+      </div>
+
+      <div class="sect">
+        <h4>Lo que te llevas tú</h4>
+        <div id="brkNet"></div>
+      </div>
+
+      <div class="verdict" id="verdict"></div>
+
+      <div class="sect" style="padding-top:13px">
+        <button class="addbtn" id="add">+ Añadir a la jornada</button>
+      </div>
+
+    </div>
+
+    <!-- ===== jornada con varias piezas ===== -->
+    <div class="res" id="diaBox" style="margin-top:16px;display:none">
+      <div class="dayhead">
+        <span>Jornada completa</span>
+        <button class="clearbtn" id="clearDia">Vaciar</button>
+      </div>
+      <div id="lista"></div>
+      <div class="sect">
+        <h4>Total del día</h4>
+        <div id="brkDia"></div>
+      </div>
+      <div class="verdict" id="verdictDia"></div>
+    </div>
+
+    <footer class="note">
+      Estimaciones orientativas calibradas para estudio de Barcelona. Los porcentajes fiscales son aproximados:
+      el IRPF real depende de tu tramo anual y de tus gastos deducibles. Consulta con tu gestoría.
+      Tus ajustes se guardan en este navegador.
+    </footer>
+  </div>
+
+</div>
+</div>
+
+<!-- Tablas y fórmula de precio: viven en precio.js, compartido con el flash
+     creator. Si cambias una tarifa, se cambia allí y cambia en los dos sitios. -->
+<!-- OJO CON LA RUTA: apunta DOS carpetas arriba, a la copia que ya usa el
+     flash creator. Aqui no hay un precio.js propio a proposito. Su norma es
+     que las tarifas no se duplican, y ya habia dos copias sancionadas (la
+     maestra de la carpeta madre y la del flash creator, que corre en su
+     propio servidor y no puede leer fuera). Una tercera aqui acabaria
+     descuadrada como acaban siempre. -->
+<script src="../../precio.js?v=1"></script>
+<script>
+(function(){
+"use strict";
+
+/* ---------------- tablas de factores ---------------- */
+/* Las tablas y la fórmula de horas/precio ya no viven aquí: están en
+   precio.js, que comparten esta calculadora y el flash creator. Antes había
+   una sola copia y sólo servía aquí; ahora el flash necesita el mismo número,
+   y dos copias de una tarifa acaban siempre descuadradas. */
+if (!window.KAOS_PRECIO) {
+  alert("Falta precio.js — tiene que estar en la misma carpeta que este archivo.");
+}
+const ESTILOS  = KAOS_PRECIO.ESTILOS;
+const ZONAS    = KAOS_PRECIO.ZONAS;
+const DETALLE  = KAOS_PRECIO.DETALLE;
+const DISENO   = KAOS_PRECIO.DISENO;
+const DEFAULTS = KAOS_PRECIO.DEFAULTS;
+
+/* ---------------- helpers ---------------- */
+const $ = id => document.getElementById(id);
+const eur = n => (Math.abs(n) < 10 ? n.toFixed(2).replace(".", ",")
+                                   : Math.round(n).toLocaleString("es-ES")) + " €";
+const eur0 = n => Math.round(n).toLocaleString("es-ES") + " €";
+const hrs = n => (n < 10 ? n.toFixed(1) : Math.round(n)).toString().replace(".", ",") + " h";
+
+/* poblar selects de tablas */
+ESTILOS.forEach(([name, v], i) => {
+  $("estilo").add(new Option(name, v));
+});
+ZONAS.forEach(([name, v]) => {
+  const o = new Option(name, v);
+  $("zona").add(o);
+});
+/* los valores de zona pueden repetirse -> usamos índice como value */
+$("zona").innerHTML = "";
+ZONAS.forEach(([name, v], i) => $("zona").add(new Option(name, String(i))));
+/* estilos también pueden repetir valor */
+$("estilo").innerHTML = "";
+ESTILOS.forEach(([name, v], i) => $("estilo").add(new Option(name, String(i))));
+
+const FIELDS = ["w","h","dens","estilo","det","color","fill","zona","piel","cover","adj",
+  "dis","dpct","drate","nivel","rate","min","split","maxses","urg","splitbase","iva","ivamode",
+  "setup","minextra","dto","dtodesde",
+  "cartauto","cart","cartp","maqp","maqv","hmes","otro","cuotasel","cuota","fijos","irpf","obj","dep"];
+
+const KEY = "tattooCalc.v1";
+const KEY_DIA = "tattooCalc.dia.v1";
+
+function readState(){
+  const s = {};
+  FIELDS.forEach(id => {
+    const el = $(id);
+    if (!el) return;
+    if (el.type === "checkbox"){ s[id] = el.checked; return; }
+    if (el.tagName === "SELECT"){ s[id] = el.value; return; }
+    /* un campo vacío o a medio escribir vale 0, nunca NaN:
+       un solo NaN contaminaba toda la cascada hasta el neto */
+    const v = parseFloat(el.value);
+    s[id] = isNaN(v) ? 0 : v;
+  });
+  return s;
+}
+
+function applyState(s){
+  FIELDS.forEach(id => {
+    const el = $(id);
+    if (!el || !(id in s)) return;
+    if (el.type === "checkbox"){ el.checked = !!s[id]; return; }
+    el.value = s[id];
+    /* si el valor guardado ya no existe como opción, volvemos al default */
+    if (el.tagName === "SELECT" && el.selectedIndex === -1) el.value = DEFAULTS[id];
+  });
+}
+
+/* estilo y zona guardados por índice */
+function styleFactor(){ return KAOS_PRECIO.styleFactor($("estilo").value); }
+function styleName(){ return KAOS_PRECIO.styleName($("estilo").value); }
+function zoneFactor(){ return KAOS_PRECIO.zoneFactor($("zona").value); }
+
+/* ---------------- el cálculo ---------------- */
+function compute(){
+  const s = readState();
+
+  /* Área, horas, horas de diseño, mínimo, urgencia y redondeo a 5 €: todo eso
+     lo hace precio.js, que es la misma fórmula que usa el flash creator. Aquí
+     sólo queda lo que es exclusivo de la calculadora: material y fiscalidad. */
+  const p = KAOS_PRECIO.precioCliente(s);
+  const {area, horas, hDis, eurDis, eurTat, eurUrg, tocaMinimo, eurRedondeo, precio, sesiones} = p;
+
+  /* --- material a su cargo --- */
+  const totalH = horas;
+  let cart = s.cart;
+  if (s.cartauto){
+    const colores = parseFloat(s.color) >= 1.25 ? (parseFloat(s.color) >= 1.45 ? 4 : 2) : 0;
+    cart = Math.ceil(2 + area / 60 + colores * 1.5) * sesiones;
+    $("cart").value = cart;
+  }
+  $("cart").disabled = s.cartauto;
+
+  const eurCart = cart * s.cartp;
+  const maqHora = (s.maqp / Math.max(1, s.maqv * 12 * Math.max(1, s.hmes)));
+  const eurMaq = maqHora * totalH;
+  const eurOtro = s.otro * sesiones;
+  const material = eurCart + eurMaq + eurOtro;
+
+  /* --- cascada hasta el neto --- */
+  const horasTrabajadas = totalH + hDis;
+  const c = cascada(precio, horasTrabajadas, material, s);
+
+  return Object.assign({s, area, horas, hDis, horasTrabajadas, eurTat, eurDis, eurUrg,
+          tocaMinimo, eurRedondeo, precio, cart, eurCart, eurMaq, eurOtro, material,
+          sesiones}, c);
+}
+
+/* Cascada fiscal: de precio de tarifa a euros limpios en tu bolsillo.
+   Se usa tanto para una pieza suelta como para el total de una jornada. */
+function cascada(precio, horasTrabajadas, material, s){
+  const ivaR = s.iva / 100;
+  let cobrado, baseImp;
+  if (s.ivamode === "inc"){ cobrado = precio; baseImp = precio / (1 + ivaR); }
+  else { baseImp = precio; cobrado = precio * (1 + ivaR); }
+  const ivaEur = cobrado - baseImp;
+
+  const repartoSobre = s.splitbase === "bruto" ? cobrado : baseImp;
+  const miParte = repartoSobre * (s.split / 100);
+  const estudio = repartoSobre - miParte;
+
+  /* cuota + gastos fijos prorrateados por hora trabajada */
+  const costeHoraFijo = (s.cuota + s.fijos) / Math.max(1, s.hmes);
+  const eurFijos = costeHoraFijo * horasTrabajadas;
+
+  const antesIrpf = miParte - material - eurFijos;
+  const eurIrpf = Math.max(0, antesIrpf) * (s.irpf / 100);
+  const neto = antesIrpf - eurIrpf;
+  const netoHora = horasTrabajadas > 0 ? neto / horasTrabajadas : 0;
+
+  /* precio que haría falta para alcanzar el objetivo de neto/hora.
+     Se despeja la cascada al revés; material y fijos no dependen del precio. */
+  const netoObjetivo = s.obj * horasTrabajadas;
+  const miParteNec = netoObjetivo / Math.max(0.01, 1 - s.irpf / 100) + material + eurFijos;
+  const repartoNec = miParteNec / Math.max(0.01, s.split / 100);
+  let precioObjetivo = s.splitbase === "bruto" ? repartoNec : repartoNec * (1 + ivaR);
+  precioObjetivo = Math.max(s.min, Math.round(precioObjetivo / 5) * 5);
+
+  return {cobrado, baseImp, ivaEur, miParte, estudio, costeHoraFijo, eurFijos,
+          eurIrpf, neto, netoHora, precioObjetivo};
+}
+
+/* ---------------- jornada con varias piezas ---------------- */
+let dia = [];
+try { dia = JSON.parse(localStorage.getItem(KEY_DIA) || "[]") || []; } catch(e){ dia = []; }
+
+function guardarDia(){
+  try { localStorage.setItem(KEY_DIA, JSON.stringify(dia)); } catch(e){}
+}
+
+/* Suma las piezas de la jornada aplicando los dos ahorros reales:
+   el mínimo del estudio se cobra una vez al día y el montaje no se repite. */
+function computeDia(s){
+  const n = dia.length;
+  if (!n) return null;
+
+  let horas = 0, hDis = 0, tarifa = 0, cart = 0, eurMaq = 0, suelto = 0, sueltoCobrado = 0;
+  dia.forEach(p => {
+    horas  += p.horas;
+    hDis   += p.hDis;
+    tarifa += p.eurTat + p.eurDis + p.eurUrg;   // solo el tiempo real, sin mínimos
+    cart   += p.cart;
+    eurMaq += p.eurMaq;
+    suelto += p.precio;                          // precio de tarifa de cada una por separado
+    sueltoCobrado += (p.cobrado != null ? p.cobrado : p.precio);  // lo que pagaría pieza a pieza
+  });
+
+  const sesiones = Math.max(1, Math.ceil(horas / Math.max(0.5, s.maxses)));
+  const material = cart * s.cartp + eurMaq + s.otro * sesiones;
+
+  /* Los dos ahorros se solapan, así que no se suman: cuando una pieza cobra el mínimo,
+     ese mínimo YA está cubriendo el montaje. Se aplica uno u otro según el caso.
+
+     - La pieza más cara del día paga el mínimo entero: es la que "abre" la jornada.
+     - Las demás bajan a un mínimo reducido si son pequeñas...
+     - ...o descuentan el montaje que no repites si ya cobran por tiempo.
+
+     Se ordena por importe para que el resultado no dependa de en qué orden las añadas. */
+  const setupUnit = (s.setup / 60) * s.rate;
+  const minExtra = s.min * (s.minextra / 100);
+  const orden = dia.slice().sort((a, b) =>
+    (b.eurTat + b.eurDis + b.eurUrg) - (a.eurTat + a.eurDis + a.eurUrg));
+
+  let conjunto = 0, ahorroSetup = 0;
+  orden.forEach((p, i) => {
+    const t = p.eurTat + p.eurDis + p.eurUrg;
+    const suelo = i === 0 ? s.min : minExtra;
+    if (t >= suelo){
+      /* cobra por tiempo: el montaje ahorrado es real y descontable */
+      const desc = i === 0 ? 0 : Math.min(setupUnit, t - suelo);
+      conjunto += t - desc;
+      ahorroSetup += desc;
+    } else {
+      /* cae en el mínimo: el propio mínimo reducido ya refleja el ahorro */
+      conjunto += suelo;
+    }
+  });
+  /* lo que no viene del montaje viene de compartir el mínimo */
+  const ahorroMinimo = Math.max(0, suelto - conjunto - ahorroSetup);
+
+  const aplicaDto = n >= parseInt(s.dtodesde, 10);
+  const antesDto = Math.max(s.min, conjunto);
+  const descuento = aplicaDto ? antesDto * (s.dto / 100) : 0;
+
+  const bruto = antesDto - descuento;
+  const tocaMinimo = bruto < s.min;
+  const precio = Math.round(Math.max(s.min, bruto) / 5) * 5;
+
+  const horasTrabajadas = horas + hDis;
+  const c = cascada(precio, horasTrabajadas, material, s);
+  const ahorro = sueltoCobrado - c.cobrado;
+
+  return Object.assign({n, horas, hDis, horasTrabajadas, tarifa, cart, material, sesiones,
+                        ahorroSetup, ahorroMinimo, descuento, aplicaDto, precio, tocaMinimo,
+                        suelto, sueltoCobrado, ahorro}, c);
+}
+
+function renderDia(){
+  const s = readState();
+  const d = computeDia(s);
+  $("diaBox").style.display = d ? "" : "none";
+  if (!d) return;
+
+  /* lista de piezas */
+  $("lista").innerHTML = dia.map((p, i) =>
+    '<div class="pz"><span class="idx">' + (i + 1) + '</span>' +
+    '<span class="info"><b class="nm">' + p.nombre + '</b>' +
+    '<span class="meta">' + p.meta + '</span></span>' +
+    '<span class="pv">' + eur0(p.cobrado != null ? p.cobrado : p.precio) + '</span>' +
+    '<button class="del" data-i="' + i + '" title="Quitar">&times;</button></div>'
+  ).join("");
+
+  /* desglose del día */
+  let x = "";
+  x += row(d.n + " piezas por separado", eur0(d.sueltoCobrado));
+  if (d.ahorroSetup > 0)
+    x += row("Montaje que no repites (" + (d.n - 1) + " × " + s.setup + " min)",
+             "−" + eur0(d.ahorroSetup), "neg");
+  if (d.ahorroMinimo > 0)
+    x += row("Mínimo reducido en las extra (" + s.minextra + "%)",
+             "−" + eur0(d.ahorroMinimo), "neg");
+  if (d.descuento > 0)
+    x += row("Descuento por " + d.n + " piezas (" + s.dto + "%)", "−" + eur0(d.descuento), "neg");
+  if (d.tocaMinimo) x += row("Suelo: mínimo del estudio", "→ " + eur0(s.min));
+  x += row("IVA " + s.iva + "%", eur0(d.ivaEur));
+  x += row("Total del día", eur0(d.cobrado), "tot");
+  if (d.ahorro > 0)
+    x += row("El cliente se ahorra", eur0(d.ahorro) + " (" +
+             Math.round(d.ahorro / d.sueltoCobrado * 100) + "%)", "save");
+  x += row("Depósito (" + s.dep + "%)", eur0(d.cobrado * s.dep / 100));
+  $("brkDia").innerHTML = x;
+
+  /* veredicto de la jornada */
+  const cabe = d.horas <= s.maxses;
+  let cls, title, msg;
+  if (!cabe){
+    cls = "w"; title = "No cabe en un solo día";
+    msg = hrs(d.horas) + " de tatuaje superan tus " + hrs(s.maxses) + " por sesión. "
+        + "Harían falta " + d.sesiones + " sesiones, así que el ahorro de montaje no se aplicaría entero.";
+  } else if (d.netoHora < d.costeHoraFijo){
+    cls = "b"; title = "Jornada por debajo del equilibrio";
+    msg = "Sacas " + eur(d.netoHora) + "/h limpios y solo cubrir cuota y fijos te cuesta "
+        + eur(d.costeHoraFijo) + "/h.";
+  } else if (d.netoHora < s.obj){
+    cls = "w"; title = "Jornada por debajo de tu objetivo";
+    msg = "Te llevas " + eur0(d.neto) + " limpios por " + hrs(d.horasTrabajadas)
+        + " de trabajo — " + eur(d.netoHora) + "/h. El total del día tendría que ser "
+        + eur0(d.precioObjetivo) + ".";
+  } else {
+    cls = "g"; title = "Buena jornada";
+    msg = "Te llevas " + eur0(d.neto) + " limpios por " + hrs(d.horasTrabajadas)
+        + " de trabajo — " + eur(d.netoHora) + "/h.";
+  }
+  $("verdictDia").innerHTML = '<span class="dot ' + cls + '"></span><div><strong class="'
+      + cls + '">' + title + '</strong>' + msg + '</div>';
+}
+
+/* ---------------- pintar ---------------- */
+function row(label, val, cls){
+  return '<div class="row ' + (cls || "") + '"><span>' + label + '</span><b>' + val + '</b></div>';
+}
+
+function render(){
+  const r = compute();
+  const s = r.s;
+
+  /* etiquetas vivas */
+  $("detLbl").textContent = DETALLE[s.det][1];
+  $("adjLbl").textContent = (s.adj > 0 ? "+" : "") + s.adj + "%";
+  $("dpctLbl").textContent = s.dpct + "%";
+  $("drateLbl").textContent = s.drate + "%";
+  $("setLbl").textContent = s.setup + " min";
+  $("mexLbl").textContent = s.minextra + "% · " + eur0(s.min * s.minextra / 100);
+  $("dtoLbl").textContent = s.dto + "%";
+  $("areaHint").textContent = "Área efectiva: " + Math.round(r.area) + " cm² · "
+      + s.w + "×" + s.h + " cm";
+  $("disHint").textContent = DISENO[s.dis].txt;
+  $("disBox").style.display = (s.dis === "flash" || s.dis === "cliente") ? "none" : "";
+  $("cartHint").textContent = "≈ " + r.cart + " cartuchos para " + r.sesiones
+      + (r.sesiones === 1 ? " sesión" : " sesiones") + " · " + eur(r.eurCart);
+  $("maqHint").textContent = "Amortización: " + (r.eurMaq / Math.max(0.01, r.horas)).toFixed(2)
+      .replace(".", ",") + " €/h → " + eur(r.eurMaq) + " en esta pieza.";
+
+  /* precio */
+  $("pPrice").innerHTML = Math.round(r.cobrado).toLocaleString("es-ES") + '<em>€</em>';
+  $("pBand").textContent = "Rango negociable: " + eur0(r.cobrado * 0.9) + " – " + eur0(r.cobrado * 1.12)
+      + (s.ivamode === "inc" ? " · IVA incl." : " · + IVA");
+  $("pMin").innerHTML = r.tocaMinimo ? '<span class="minflag">Aplica el mínimo de ' + s.min + ' €</span>' : "";
+
+  $("kHoras").textContent = hrs(r.horas).replace(" h", "");
+  $("kSes").textContent = r.sesiones;
+  $("kDep").textContent = eur0(r.cobrado * s.dep / 100);
+
+  /* desglose de precio */
+  let p = "";
+  p += row("Tatuaje · " + hrs(r.horas) + " × " + eur0(s.rate) + "/h", eur0(r.eurTat));
+  if (r.tocaMinimo) p += row("Ajuste al mínimo del estudio", "→ " + eur0(s.min));
+  if (r.hDis > 0) p += row("Diseño · " + hrs(r.hDis) + " al " + s.drate + "%", eur0(r.eurDis));
+  if (r.eurUrg > 0) p += row("Recargo por urgencia (15%)", eur0(r.eurUrg));
+  if (Math.abs(r.eurRedondeo) >= 0.5)
+    p += row("Redondeo comercial", (r.eurRedondeo > 0 ? "+" : "−") + eur(Math.abs(r.eurRedondeo)));
+  if (s.ivamode === "inc"){
+    p += row("Base imponible", eur0(r.baseImp));
+    p += row("IVA " + s.iva + "%", eur0(r.ivaEur));
+  } else {
+    p += row("IVA " + s.iva + "% (se suma)", eur0(r.ivaEur));
+  }
+  p += row("Total al cliente", eur0(r.cobrado), "tot");
+  $("brkPrice").innerHTML = p;
+
+  /* desglose de neto */
+  let n = "";
+  n += row("Reparto sobre " + (s.splitbase === "bruto" ? "el total" : "la base sin IVA"),
+           eur0(s.splitbase === "bruto" ? r.cobrado : r.baseImp));
+  n += row("Al estudio (" + (100 - s.split) + "%)", "−" + eur0(r.estudio), "neg");
+  n += row("Tu parte (" + s.split + "%)", eur0(r.miParte));
+  n += row("Cartuchos (" + r.cart + " ud)", "−" + eur(r.eurCart), "neg");
+  n += row("Amortización de máquina", "−" + eur(r.eurMaq), "neg");
+  if (r.eurOtro > 0) n += row("Otros gastos tuyos", "−" + eur(r.eurOtro), "neg");
+  n += row("Cuota autónomo + fijos (" + hrs(r.horasTrabajadas) + ")", "−" + eur0(r.eurFijos), "neg");
+  n += row("IRPF " + s.irpf + "%", "−" + eur0(r.eurIrpf), "neg");
+  n += row("Neto limpio", eur0(r.neto), "tot");
+  n += row("Por hora trabajada", eur0(r.netoHora) + "/h");
+  $("brkNet").innerHTML = n;
+
+  /* semáforo */
+  const obj = s.obj;
+  const paraObj = " Para llegar a " + eur0(obj) + "/h limpios tendrías que cobrar " + eur0(r.precioObjetivo) + ".";
+  let cls, title, msg;
+  if (r.netoHora <= 0){
+    cls = "b"; title = "Pierdes dinero";
+    msg = "Con este precio no cubres ni el material ni tus gastos fijos." + paraObj;
+  } else if (r.netoHora < r.costeHoraFijo){
+    cls = "b"; title = "Por debajo de tu punto de equilibrio";
+    msg = "Solo cubrir cuota y gastos fijos ya te cuesta " + eur(r.costeHoraFijo)
+        + "/h y aquí sacas " + eur(r.netoHora) + "/h." + paraObj;
+  } else if (r.netoHora < obj * 0.85){
+    cls = "w"; title = "Por debajo de tu objetivo";
+    msg = "Sacas " + eur(r.netoHora) + "/h limpios frente a los " + eur0(obj) + "/h que buscas." + paraObj;
+  } else if (r.netoHora < obj){
+    cls = "w"; title = "Casi en objetivo";
+    msg = "Sacas " + eur(r.netoHora) + "/h limpios. Te faltan " + eur(obj - r.netoHora)
+        + "/h; el precio redondo sería " + eur0(r.precioObjetivo) + ".";
+  } else {
+    cls = "g"; title = "Pieza rentable";
+    msg = "Sacas " + eur(r.netoHora) + "/h limpios, por encima de tu objetivo de " + eur0(obj) + "/h.";
+  }
+  $("verdict").innerHTML = '<span class="dot ' + cls + '"></span><div><strong class="' + cls + '">'
+      + title + '</strong>' + msg + '</div>';
+
+  renderDia();
+
+  /* guardar */
+  try { localStorage.setItem(KEY, JSON.stringify(readState())); } catch(e){}
+}
+
+/* ---------------- enlaces entre campos ---------------- */
+$("nivel").addEventListener("change", e => {
+  const v = parseFloat(e.target.value);
+  if (v > 0) $("rate").value = v;
+  render();
+});
+$("rate").addEventListener("input", () => { $("nivel").value = "0"; });
+
+$("cuotasel").addEventListener("change", e => {
+  const v = parseFloat(e.target.value);
+  if (v > 0) $("cuota").value = v;
+  render();
+});
+$("cuota").addEventListener("input", () => { $("cuotasel").value = "0"; });
+
+$("dis").addEventListener("change", e => {
+  const d = DISENO[e.target.value];
+  $("dpct").value = d.pct;
+  $("drate").value = d.rate;
+  render();
+});
+
+$("reset").addEventListener("click", () => {
+  applyState(DEFAULTS);
+  render();
+});
+
+/* --- jornada --- */
+$("add").addEventListener("click", () => {
+  const r = compute();
+  const s = r.s;
+  dia.push({
+    nombre: styleName() + " · " + s.w + "×" + s.h + " cm",
+    meta: ZONAS[+$("zona").value][0] + " · " + hrs(r.horas)
+        + (r.hDis > 0 ? " + " + hrs(r.hDis) + " de diseño" : ""),
+    horas: r.horas, hDis: r.hDis,
+    eurTat: Math.max(0, r.eurTat), eurDis: r.eurDis, eurUrg: r.eurUrg,
+    cart: r.cart, eurMaq: r.eurMaq, precio: r.precio, cobrado: r.cobrado
+  });
+  guardarDia();
+  renderDia();
+  $("diaBox").scrollIntoView({behavior:"smooth", block:"nearest"});
+});
+
+$("clearDia").addEventListener("click", () => {
+  dia = [];
+  guardarDia();
+  renderDia();
+});
+
+$("lista").addEventListener("click", e => {
+  const b = e.target.closest(".del");
+  if (!b) return;
+  dia.splice(+b.dataset.i, 1);
+  guardarDia();
+  renderDia();
+});
+
+FIELDS.forEach(id => {
+  const el = $(id);
+  if (el) el.addEventListener("input", render);
+});
+
+/* ---------------- arranque ---------------- */
+let saved = null;
+try { saved = JSON.parse(localStorage.getItem(KEY) || "null"); } catch(e){}
+applyState(Object.assign({}, DEFAULTS, saved || {}));
+render();
+
+})();
+</script>
+<!-- Local-only interaction log, for evidence-based UX work.
+     Console: KAOS_USAGE.report() -->
+<script src="usage.js?v=1"></script>
+</body>
+</html>
